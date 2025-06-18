@@ -54,8 +54,8 @@ if st.session_state.triage_result:
         st.session_state.show_email_draft = True
 
         if st.session_state.show_email_draft:
-        st.markdown("Email Draft")
-        st.code(result.email_draft, language="markdown")
+            st.markdown("Email Draft")
+            st.code(result.email_draft, language="markdown")
 
         colA, colB = st.columns([1, 1])
         with colA:
