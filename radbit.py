@@ -5,9 +5,11 @@ from agents import Agent, Runner
 email_draft_agent = Agent(
     name="Email Draft Generator",
     instructions="""
-    Write a conversational, human-sounding email based on the user's description.
-    Include greeting, problem description, steps attempted, and a courteous request for help.
-    Close with a friendly sign-off. Avoid headings or bullet formatting.
+    Write a conversational, polite email summarizing the user's issue.
+    Use a human tone: open with a neutral greeting like 'To whom it may concern' if no specific name is provided.
+    Include what happened, any steps they've already taken, and a request for help.
+    Close with something friendly like 'Thank you' and sign as '[Your Name]'.
+    Avoid headings, bullet points, or formal report formatting.
     """,
     model="gpt-4o"
 )
