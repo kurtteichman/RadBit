@@ -12,6 +12,7 @@ radsupport_agent = Agent(
     Also, compile a clean email draft summarizing the user input which you would send to Radsupport (yourself) to get additional help.
     """,
     model="gpt-4o"
+)
 
 wcit_agent = Agent(
     name="WCINYP IT Agent",
