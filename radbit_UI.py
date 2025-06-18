@@ -53,9 +53,9 @@ if st.session_state.triage_result:
     if st.button("View Email Draft", use_container_width=True):
         st.session_state.show_email_draft = True
 
-        if st.session_state.show_email_draft:
-            st.markdown("### Email Draft")
-            st.code(result.email_draft, language="markdown")
+    if st.session_state.show_email_draft:
+        st.markdown("### Email Draft")
+        st.code(result.email_draft, language="markdown")
 
         colA, colB = st.columns([1, 1])
         with colA:
@@ -65,4 +65,3 @@ if st.session_state.triage_result:
 
         if send_myself:
             st.markdown("No problem — feel free to copy the draft above and send it yourself.")
-
