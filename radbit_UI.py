@@ -39,7 +39,7 @@ if submit and current_input.strip():
 
 if st.session_state.triage_result:
     result = st.session_state.triage_result
-    st.markdown("### ✅ Recommended Support Contact")
+    st.markdown("Recommended Support Contact")
     st.markdown(f"**Department:** {result.department}")
     st.markdown(f"**Phone:** {result.phone}")
     st.markdown(f"**Email:** {result.email}")
@@ -53,12 +53,14 @@ if st.session_state.triage_result:
     if st.button("View Email Draft", use_container_width=True):
         st.session_state.show_email_draft = True
 
-    if st.session_state.show_email_draft:
-        st.markdown("### 📄 Email Draft")
+        if st.session_state.show_email_draft:
+        st.markdown("Email Draft")
         st.code(result.email_draft, language="markdown")
 
         colA, colB = st.columns([1, 1])
         with colA:
             st.button("Send Email", disabled=True)
         with colB:
-            st.button("I'll Send It Myself", disabled=True)
+            if st.button("I'll Send It Myself"):
+                st.success("No problem — feel free to use the draft above when sending your own email.")
+
