@@ -2,50 +2,62 @@ import asyncio
 from pydantic import BaseModel
 from agents import Agent, Runner, set_default_openai_key
 
+# Email Draft Agent (Human-Sounding Output)
+email_draft_agent = Agent(
+    name="Email Draft Generator",
+    instructions="""
+    You are a helpful assistant that converts a user's issue into a professional but human-sounding email to IT or clinical support.
+    The email should have a greeting, clearly describe the issue in natural language, and include any relevant actions the user has already taken.
+    Avoid bullet points, headings, or formatting like "Impact:" or "Issue:". End with a polite request for help and a sign-off.
+    """,
+    model="gpt-4o",
+    temperature=0
+)
+
+# Specialized Support Agents
 hospital_rr_agent = Agent(
     name="Hospital Reading Rooms Agent",
     instructions="""
-    You are the support agent for Hospital Reading Rooms at Cornell, LMH, and BMH.
-    Handle urgent clinical or workstation support for radiologists on-site at those hospitals.
-    Contact options:
-    Phone: 4-HELP (4-4357) or (212) 932-4357
-    Email: servicedesk@nyp.org with Subject: RADSUPPORTEASTCRITICAL
-    Availability: 24 hours
-    Provide instructions on how to contact and create a clean summary email.
+    Handle urgent clinical workstation and PACS issues at Cornell, LMH, and BMH.
+    Contact info:
+    - Phone: 4-HELP (4-4357) or (212) 932-4357
+    - Email: servicedesk@nyp.org with Subject: RADSUPPORTEASTCRITICAL
+    - Hours: 24/7
     """,
-    model="gpt-4o"
+    model="gpt-4o",
+    temperature=0
 )
 
 virtual_helpdesk_agent = Agent(
     name="Virtual HelpDesk Agent",
     instructions="""
-    You are the NYP Virtual HelpDesk agent for Cornell, LMH, and BMH.
-    Handle Zoom-based support requests for general issues Monday through Friday, 9am–5pm.
+    Handle Zoom-based support for general IT issues at Cornell, LMH, and BMH.
     Zoom: https://nyph.zoom.us/j/9956909465
-    Provide connection instructions and generate a clean support email summary if necessary.
+    Hours: Monday–Friday, 9am–5pm
     """,
-    model="gpt-4o"
+    model="gpt-4o",
+    temperature=0
 )
 
 wcinyp_agent = Agent(
     name="WCINYP IT Agent",
     instructions="""
-    You are WCINYP IT Support. Handle issues related to email access, VPN, hospital system access, and general teleradiology IT for WCINYP sites and home setups.
+    Handle WCINYP teleradiology and home workstation issues: VPN, Outlook, login, etc.
     Email: wcinypit@med.cornell.edu
-    Availability: 7am–7pm
-    Generate a clean support summary and list appropriate actions.
+    Hours: 7am–7pm
     """,
-    model="gpt-4o"
+    model="gpt-4o",
+    temperature=0
 )
 
 radiqal_agent = Agent(
     name="Radiqal Agent",
     instructions="""
-    You are the Radiqal support agent. Guide radiologists to submit QA or ticketing issues using Radiqal via Medicalis or VuePACS.
-    Provide guidance based on the Radiqal Tip Sheet if needed.
-    Summarize the user query into a brief QA ticket description if appropriate.
+    Guide users to submit QA or discrepancy tickets using Radiqal via Medicalis or VuePACS.
+    Hours: Based on platform availability.
     """,
-    model="gpt-4o"
+    model="gpt-4o",
+    temperature=0
 )
 
 class SupportResponse(BaseModel):
@@ -62,18 +74,24 @@ class DepartmentLabel(BaseModel):
 triage_agent = Agent(
     name="Support Triage Agent",
     instructions="""
-    Route the user query to one of the following support groups: 
+    Route the user query to one of the following:
     - Hospital Reading Rooms
     - Virtual HelpDesk
     - WCINYP IT
     - Radiqal
 
-    Choose the best one based on the query and return:
-    {"department": "Hospital Reading Rooms"}, etc.
+    Only select one. Respond using:
+    {"department": "Hospital Reading Rooms"} or similar.
     """,
     output_type=DepartmentLabel,
-    handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
-    model="gpt-4o"
+    handoffs=[
+        hospital_rr_agent,
+        virtual_helpdesk_agent,
+        wcinyp_agent,
+        radiqal_agent
+    ],
+    model="gpt-4o",
+    temperature=0
 )
 
 def run_async_task(task):
@@ -89,39 +107,41 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     dept = triage_result.final_output.department
 
     if dept == "Hospital Reading Rooms":
-        agent = hospital_rr_agent
         phone = "4-HELP (4-4357) or (212) 932-4357"
-        email = "servicedesk@nyp.org"
+        email = "servicedesk@nyp.org (Subject: RADSUPPORTEASTCRITICAL)"
         hours = "24 hours"
-        link = "Subject line: RADSUPPORTEASTCRITICAL"
+        link = ""
+        agent = hospital_rr_agent
     elif dept == "Virtual HelpDesk":
-        agent = virtual_helpdesk_agent
-        phone = "Zoom only"
+        phone = "Zoom: https://nyph.zoom.us/j/9956909465"
         email = "N/A"
         hours = "Monday–Friday, 9 AM to 5 PM"
-        link = "https://nyph.zoom.us/j/9956909465"
+        link = ""
+        agent = virtual_helpdesk_agent
     elif dept == "WCINYP IT":
-        agent = wcinyp_agent
         phone = "N/A"
         email = "wcinypit@med.cornell.edu"
         hours = "7 AM to 7 PM"
         link = ""
+        agent = wcinyp_agent
     elif dept == "Radiqal":
-        agent = radiqal_agent
         phone = "N/A"
         email = "Use Medicalis or VuePACS"
-        hours = "Based on platform availability"
+        hours = "Dependent on platform availability"
         link = "Radiqal Tip Sheet"
+        agent = radiqal_agent
     else:
         raise ValueError("Unknown department returned by triage agent.")
 
-    support_response = run_async_task(Runner.run(agent, user_input))
+    run_async_task(Runner.run(agent, user_input))  # Call for logging/consistency
+
+    draft_result = run_async_task(Runner.run(email_draft_agent, user_input))
 
     return SupportResponse(
         department=dept,
         phone=phone,
         email=email,
-        email_draft=support_response.final_output,
+        email_draft=draft_result.final_output,
         link=link,
         hours=hours
     )
