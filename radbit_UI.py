@@ -15,20 +15,18 @@ if "user_input" not in st.session_state:
 if "triage_result" not in st.session_state:
     st.session_state.triage_result = None
 
-user_input = st.text_area("Describe your issue", value=st.session_state.user_input, height=200)
+if "show_email_draft" not in st.session_state:
+    st.session_state.show_email_draft = False
 
-col1, col2 = st.columns([1, 2])
-with col1:
-    submit = st.button("Submit Request", use_container_width=True)
-with col2:
-    view_email = st.button("View Email Draft", use_container_width=True)
+st.session_state.user_input = st.text_area("Describe your issue", value=st.session_state.user_input, height=200)
 
-if submit and user_input.strip():
+submit = st.button("Submit Request", use_container_width=True)
+
+if submit and st.session_state.user_input.strip():
     with st.spinner("Triaging your request..."):
-        result = triage_and_get_support_info(user_input.strip())
+        result = triage_and_get_support_info(st.session_state.user_input.strip())
         st.session_state.triage_result = result
-        st.session_state.user_input = user_input.strip()
-        view_email = False
+        st.session_state.show_email_draft = False
 
 if st.session_state.triage_result:
     result = st.session_state.triage_result
@@ -43,15 +41,17 @@ if st.session_state.triage_result:
     st.markdown(f"**Available:** {result.hours}")
 
     st.markdown("---")
-    st.markdown("Would you like help composing an email?")
-    show_email = view_email
+    st.markdown("Would you like help drafting an email to this support group?")
+    
+    if st.button("View Email Draft", use_container_width=True):
+        st.session_state.show_email_draft = True
 
-    if show_email:
+    if st.session_state.show_email_draft:
         st.markdown("### 📄 Email Draft")
         st.code(result.email_draft, language="markdown")
 
-        colA, colB = st.columns([1, 2])
+        colA, colB = st.columns([1, 1])
         with colA:
-            st.button("Send Email", disabled=True)  # Placeholder
+            st.button("Send Email", disabled=True)  #placeholder
         with colB:
             st.button("I'll Send It Myself", disabled=True)
