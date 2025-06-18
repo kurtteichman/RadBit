@@ -16,23 +16,20 @@ if "triage_result" not in st.session_state:
 if "show_email_draft" not in st.session_state:
     st.session_state.show_email_draft = False
 
-# Store prior input to detect changes
 if "last_submitted_input" not in st.session_state:
     st.session_state.last_submitted_input = ""
 
-# Text input
+
 current_input = st.text_area("Describe your issue", value=st.session_state.user_input, height=200)
 
 submit = st.button("Submit Request", use_container_width=True)
 
-# Detect input change and clear old state
 if current_input.strip() != st.session_state.user_input.strip():
     st.session_state.triage_result = None
     st.session_state.show_email_draft = False
 
 st.session_state.user_input = current_input
 
-# Run triage
 if submit and current_input.strip():
     with st.spinner("Triaging your request..."):
         result = triage_and_get_support_info(current_input.strip())
@@ -40,7 +37,6 @@ if submit and current_input.strip():
         st.session_state.show_email_draft = False
         st.session_state.last_submitted_input = current_input.strip()
 
-# Display triage result
 if st.session_state.triage_result:
     result = st.session_state.triage_result
     st.markdown("Recommended Support Contact")
