@@ -55,7 +55,7 @@ if st.session_state.triage_result:
 
     if st.session_state.show_email_draft:
         st.markdown("### Email Draft")
-        st.code(result.email_draft, language="markdown")
+        st.text_area("Email Draft", value=result.email_draft, height=300)
 
         colA, colB = st.columns([1, 1])
         with colA:
