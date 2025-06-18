@@ -9,7 +9,7 @@ radsupport_agent = Agent(
     If a user's query involves clinical imaging tools, viewer errors, radiologist login, or interpretation-related tech, respond with the Radsupport contact:
     Phone: (212) 746-2323
     Email: radsupport@med.cornell.edu
-    Also, compile a clean email draft summarizing the user input which you would send to Radsupport (yourself) to get additional help.
+    Also, compile a clean email draft summarizing the user input.
     """,
     model="gpt-4o"
 )
@@ -21,25 +21,28 @@ wcit_agent = Agent(
     If a user's query involves computer access, login issues unrelated to imaging tools, or software installation, respond with the WCINYP IT contact:
     Phone: (212) 746-4878
     Email: support@med.cornell.edu
-    Also, compile a clean email draft summarizing the user input which you would send to WCINYP (yourself) to get additional help.
+    Also, compile a clean email draft summarizing the user input.
     """,
     model="gpt-4o"
 )
 
 class SupportResponse(BaseModel):
-    department: str  # "Radsupport" or "WCINYP IT"
+    department: str
     phone: str
     email: str
     email_draft: str
+
+class DepartmentLabel(BaseModel):
+    department: str
 
 triage_agent = Agent(
     name="Support Triage Agent",
     instructions="""
     Route the user query to the correct support group: Radsupport or WCINYP IT.
-    Only choose one based on the query content. Return your response in JSON format:
+    Only choose one based on the query content. Respond in JSON format:
     {"department": "Radsupport"} or {"department": "WCINYP IT"}
     """,
-    output_type=BaseModel.construct(__annotations__={"department": str}),
+    output_type=DepartmentLabel,
     handoffs=[radsupport_agent, wcit_agent],
     model="gpt-4o"
 )
