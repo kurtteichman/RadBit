@@ -39,7 +39,7 @@ if submit and current_input.strip():
 
 if st.session_state.triage_result:
     result = st.session_state.triage_result
-    st.markdown("Recommended Support Contact")
+    st.markdown("### Recommended Support Contact")
     st.markdown(f"**Department:** {result.department}")
     st.markdown(f"**Phone:** {result.phone}")
     st.markdown(f"**Email:** {result.email}")
@@ -55,7 +55,7 @@ if st.session_state.triage_result:
 
     if st.session_state.show_email_draft:
         st.markdown("### Email Draft")
-        st.text_area("Email Draft", value=result.email_draft, height=300)
+        st.text_area("Email Draft - edit at your discretion", value=result.email_draft, height=300)
 
         colA, colB = st.columns([1, 1])
         with colA:
