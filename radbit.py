@@ -2,7 +2,6 @@ import asyncio
 from pydantic import BaseModel
 from agents import Agent, Runner, set_default_openai_key
 
-# Email Draft Agent (Human-Sounding Output)
 email_draft_agent = Agent(
     name="Email Draft Generator",
     instructions="""
@@ -10,11 +9,9 @@ email_draft_agent = Agent(
     The email should have a greeting, clearly describe the issue in natural language, and include any relevant actions the user has already taken.
     Avoid bullet points, headings, or formatting like "Impact:" or "Issue:". End with a polite request for help and a sign-off.
     """,
-    model="gpt-4o",
-    temperature=0
+    model="gpt-4o"
 )
 
-# Specialized Support Agents
 hospital_rr_agent = Agent(
     name="Hospital Reading Rooms Agent",
     instructions="""
@@ -24,8 +21,7 @@ hospital_rr_agent = Agent(
     - Email: servicedesk@nyp.org with Subject: RADSUPPORTEASTCRITICAL
     - Hours: 24/7
     """,
-    model="gpt-4o",
-    temperature=0
+    model="gpt-4o"
 )
 
 virtual_helpdesk_agent = Agent(
@@ -35,8 +31,7 @@ virtual_helpdesk_agent = Agent(
     Zoom: https://nyph.zoom.us/j/9956909465
     Hours: Monday–Friday, 9am–5pm
     """,
-    model="gpt-4o",
-    temperature=0
+    model="gpt-4o"
 )
 
 wcinyp_agent = Agent(
@@ -46,8 +41,7 @@ wcinyp_agent = Agent(
     Email: wcinypit@med.cornell.edu
     Hours: 7am–7pm
     """,
-    model="gpt-4o",
-    temperature=0
+    model="gpt-4o"
 )
 
 radiqal_agent = Agent(
@@ -56,8 +50,7 @@ radiqal_agent = Agent(
     Guide users to submit QA or discrepancy tickets using Radiqal via Medicalis or VuePACS.
     Hours: Based on platform availability.
     """,
-    model="gpt-4o",
-    temperature=0
+    model="gpt-4o"
 )
 
 class SupportResponse(BaseModel):
@@ -90,8 +83,7 @@ triage_agent = Agent(
         wcinyp_agent,
         radiqal_agent
     ],
-    model="gpt-4o",
-    temperature=0
+    model="gpt-4o"
 )
 
 def run_async_task(task):
@@ -133,7 +125,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     else:
         raise ValueError("Unknown department returned by triage agent.")
 
-    run_async_task(Runner.run(agent, user_input))  # Call for logging/consistency
+    run_async_task(Runner.run(agent, user_input)) 
 
     draft_result = run_async_task(Runner.run(email_draft_agent, user_input))
 
