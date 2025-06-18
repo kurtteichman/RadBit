@@ -21,9 +21,7 @@ if "show_email_draft" not in st.session_state:
 if "last_submitted_input" not in st.session_state:
     st.session_state.last_submitted_input = ""
 
-
 current_input = st.text_area("Describe your issue", value=st.session_state.user_input, height=200)
-
 submit = st.button("Submit Request", use_container_width=True)
 
 if current_input.strip() != st.session_state.user_input.strip():
@@ -41,15 +39,13 @@ if submit and current_input.strip():
 
 if st.session_state.triage_result:
     result = st.session_state.triage_result
-    st.markdown("Recommended Support Contact")
+    st.markdown("### ✅ Recommended Support Contact")
     st.markdown(f"**Department:** {result.department}")
     st.markdown(f"**Phone:** {result.phone}")
     st.markdown(f"**Email:** {result.email}")
-    if result.link and "zoom" in result.link.lower():
-        st.markdown(f"**Zoom Link:** [{result.link}]({result.link})")
-    elif result.link:
-        st.markdown(f"**Note:** {result.link}")
-    st.markdown(f"**Available:** {result.hours}")
+    st.markdown(f"**Other Info:** {result.other}")
+    st.markdown(f"**Note:** {result.note}")
+    st.markdown(f"**Availability:** {result.hours}")
 
     st.markdown("---")
     st.markdown("Would you like help drafting an email to this support group?")
@@ -58,7 +54,7 @@ if st.session_state.triage_result:
         st.session_state.show_email_draft = True
 
     if st.session_state.show_email_draft:
-        st.markdown("Email Draft")
+        st.markdown("### 📄 Email Draft")
         st.code(result.email_draft, language="markdown")
 
         colA, colB = st.columns([1, 1])
