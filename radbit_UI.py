@@ -1,5 +1,8 @@
 import streamlit as st
 from triage_logic import triage_and_get_support_info
+from agents import set_default_openai_key
+
+set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 
 st.set_page_config(page_title="Radiology Support Triage", layout="centered")
 st.title("Radiologist Support Request Portal")
