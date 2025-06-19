@@ -66,9 +66,7 @@ with top_col1:
         st.markdown(f"**Availability:** {result.hours}")
 
 with top_col2:
-    st.markdown("### Email Draft")
     if st.session_state.triage_result and st.session_state.show_email_draft:
+        st.markdown("### Email Draft")
         st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
-
         st.button("Send Email", disabled=True)
-
