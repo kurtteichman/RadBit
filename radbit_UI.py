@@ -7,7 +7,7 @@ set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support Triage", layout="centered")
 
 st.title("Radiology Support Triage Portal")
-st.markdown("Please describe your issue below. We’ll route you to the correct support group and provide contact options.")
+st.markdown("Please describe your issue below and we’ll route you to the correct support group/provide contact options.")
 
 if "user_input" not in st.session_state:
     st.session_state.user_input = ""
@@ -46,7 +46,7 @@ if submit and current_input.strip():
         st.session_state.triage_result = None
         st.session_state.show_email_draft = False
         st.session_state.manual_send_clicked = False
-        st.error("This tool only supports questions related to radiology support. Please enter a relevant issue.")
+        st.error("This tool only supports questions related to radiology support - please enter a relevant issue.")
 
 if st.session_state.triage_result:
     result = st.session_state.triage_result
@@ -70,7 +70,7 @@ if st.session_state.triage_result:
 
         colA, colB = st.columns([1, 1])
         with colA:
-            st.button("Send Email", disabled=True)
+            st.button("Send Email", disabled=True) #placeholder
         with colB:
             send_myself = st.button("I'll Send It Myself")
 
