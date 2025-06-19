@@ -1,9 +1,9 @@
-import json
-import os
-from datetime import datetime
 import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
 from radbit import triage_and_get_support_info
+import json
+import os
+from datetime import datetime
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
@@ -31,11 +31,33 @@ theme = st.sidebar.radio("Choose Theme", ["Light", "Dark", "High Contrast"])
 st.session_state.theme = theme
 
 if theme == "Dark":
-    st.markdown("<style>body { background-color: #1e1e1e; color: white; }</style>", unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+            html, body, [class*="css"]  {
+                background-color: #1e1e1e;
+                color: white;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 elif theme == "High Contrast":
-    st.markdown("<style>body { background-color: white; color: black; font-weight: bold; }</style>", unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+            html, body, [class*="css"]  {
+                background-color: white;
+                color: black;
+                font-weight: bold;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 else:
-    st.markdown("<style>body { background-color: white; color: black; }</style>", unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+            html, body, [class*="css"]  {
+                background-color: white;
+                color: black;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
 st.title("Radiology Support Portal")
 st.markdown("Please describe your issue below and we’ll route you to the correct support group and provide contact options.")
@@ -65,7 +87,14 @@ with top_col1:
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "input": current_input.strip(),
                     "department": result.department,
-                    "email_draft": result.email_draft
+                    "contact_info": {
+                        "Department": result.department,
+                        "Phone": result.phone,
+                        "Email": result.email,
+                        "Other Info": result.other,
+                        "Note": result.note,
+                        "Availability": result.hours
+                    }
                 }
                 st.session_state.history.append(entry)
                 with open(HISTORY_FILE, "w") as f:
@@ -77,20 +106,19 @@ with top_col1:
 
     if st.session_state.triage_result:
         result = st.session_state.triage_result
-        with st.expander("View Recommended Support Contact", expanded=True):
-            st.markdown(f"**Department:** {result.department}")
-            st.markdown(f"**Phone:** {result.phone}")
-            st.markdown(f"**Email:** {result.email}")
-            st.markdown(f"**Other Info:** {result.other}")
-            st.markdown(f"**Note:** {result.note}")
-            st.markdown(f"**Availability:** {result.hours}")
+        st.markdown("### Recommended Support Contact")
+        st.markdown(f"**Department:** {result.department}")
+        st.markdown(f"**Phone:** {result.phone}")
+        st.markdown(f"**Email:** {result.email}")
+        st.markdown(f"**Other Info:** {result.other}")
+        st.markdown(f"**Note:** {result.note}")
+        st.markdown(f"**Availability:** {result.hours}")
 
 with top_col2:
     if st.session_state.triage_result and st.session_state.show_email_draft:
         st.subheader("Email Draft")
         st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
-        st.download_button("Copy Draft", data=st.session_state.triage_result.email_draft, file_name="email_draft.txt", mime="text/plain")
-        st.button("Send Email", disabled=True)
+        st.markdown("Use **Ctrl+C** (or **Cmd+C** on Mac) to copy the text above.")
 
 st.divider()
 with st.expander("Request History", expanded=False):
@@ -105,5 +133,10 @@ with st.expander("Request History", expanded=False):
         - **Input:** {entry['input']}
         - **Department:** {entry['department']}
         """)
-        with st.expander("View Email Draft"):
-            st.code(entry["email_draft"], language="markdown")
+        with st.expander("View Recommended Support Contact"):
+            st.markdown(f"**Department:** {entry['contact_info']['Department']}")
+            st.markdown(f"**Phone:** {entry['contact_info']['Phone']}")
+            st.markdown(f"**Email:** {entry['contact_info']['Email']}")
+            st.markdown(f"**Other Info:** {entry['contact_info']['Other Info']}")
+            st.markdown(f"**Note:** {entry['contact_info']['Note']}")
+            st.markdown(f"**Availability:** {entry['contact_info']['Availability']}")
