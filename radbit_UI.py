@@ -1,9 +1,9 @@
-import streamlit as st
-from agents import set_default_openai_key, InputGuardrailTripwireTriggered
-from radbit import triage_and_get_support_info
 import json
 import os
 from datetime import datetime
+import streamlit as st
+from agents import set_default_openai_key, InputGuardrailTripwireTriggered
+from radbit import triage_and_get_support_info
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
@@ -24,50 +24,24 @@ if "history" not in st.session_state:
             st.session_state.history = json.load(f)
     else:
         st.session_state.history = []
-if "theme" not in st.session_state:
-    st.session_state.theme = "Light"
 
-theme = st.sidebar.radio("Choose Theme", ["Light", "Dark", "High Contrast"])
-st.session_state.theme = theme
-
+theme = st.sidebar.selectbox("Theme", ["Light", "Dark", "High Contrast"])
 if theme == "Dark":
-    st.markdown("""
-        <style>
-            html, body, [class*="css"]  {
-                background-color: #1e1e1e;
-                color: white;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+    st.write('<style>body{background-color:#1e1e1e;color:white;}</style>', unsafe_allow_html=True)
 elif theme == "High Contrast":
-    st.markdown("""
-        <style>
-            html, body, [class*="css"]  {
-                background-color: white;
-                color: black;
-                font-weight: bold;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+    st.write('<style>body{background-color:white;color:black;font-weight:bold;}</style>', unsafe_allow_html=True)
 else:
-    st.markdown("""
-        <style>
-            html, body, [class*="css"]  {
-                background-color: white;
-                color: black;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+    st.write('<style>body{background-color:white;color:black;}</style>', unsafe_allow_html=True)
 
 st.title("Radiology Support Portal")
 st.markdown("Please describe your issue below and we’ll route you to the correct support group and provide contact options.")
 
 st.divider()
-top_col1, top_col2 = st.columns([1.25, 1.75], gap="large")
+left, right = st.columns([1.25, 1.75], gap="large")
 
-with top_col1:
+with left:
     st.subheader("Describe Your Issue")
-    current_input = st.text_area("Request", value=st.session_state.user_input, height=200, label_visibility="collapsed")
+    current_input = st.text_area("", value=st.session_state.user_input, height=200, label_visibility="collapsed")
     submit = st.button("Submit Request", use_container_width=True)
 
     if current_input.strip() != st.session_state.user_input.strip():
@@ -114,29 +88,33 @@ with top_col1:
         st.markdown(f"**Note:** {result.note}")
         st.markdown(f"**Availability:** {result.hours}")
 
-with top_col2:
+with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
         st.subheader("Email Draft")
-        st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
-        st.markdown("Use **Ctrl+C** (or **Cmd+C** on Mac) to copy the text above.")
+        draft = st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
+        btn_send = st.button("Send Email", disabled=True)
+        btn_copy = st.button("Copy to Clipboard")
+
+        if btn_copy:
+            st.write(
+                f"""
+                <script>
+                navigator.clipboard.writeText({json.dumps(draft)});
+                </script>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.success("Draft copied to clipboard")
 
 st.divider()
 with st.expander("Request History", expanded=False):
-    clear = st.button("Clear History")
-    if clear:
+    if st.button("Clear History"):
         st.session_state.history = []
         if os.path.exists(HISTORY_FILE):
             os.remove(HISTORY_FILE)
     for entry in reversed(st.session_state.history[-10:]):
-        st.markdown(f"""
-        **{entry['timestamp']}**
-        - **Input:** {entry['input']}
-        - **Department:** {entry['department']}
-        """)
+        st.markdown(f"**{entry['timestamp']}**  \n• Input: {entry['input']}  \n• Department: {entry['department']}")
         with st.expander("View Recommended Support Contact"):
-            st.markdown(f"**Department:** {entry['contact_info']['Department']}")
-            st.markdown(f"**Phone:** {entry['contact_info']['Phone']}")
-            st.markdown(f"**Email:** {entry['contact_info']['Email']}")
-            st.markdown(f"**Other Info:** {entry['contact_info']['Other Info']}")
-            st.markdown(f"**Note:** {entry['contact_info']['Note']}")
-            st.markdown(f"**Availability:** {entry['contact_info']['Availability']}")
+            info = entry['contact_info']
+            for k, v in info.items():
+                st.markdown(f"**{k}:** {v}")
