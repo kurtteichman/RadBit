@@ -4,9 +4,9 @@ from radbit import triage_and_get_support_info
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 
-st.set_page_config(page_title="Radiology Support Triage", layout="centered")
+st.set_page_config(page_title="Radiology Support", layout="centered")
 
-st.title("Radiology Support Triage Portal")
+st.title("Radiology Support Portal")
 st.markdown("Please describe your issue below and we’ll route you to the correct support group/provide contact options.")
 
 if "user_input" not in st.session_state:
@@ -36,7 +36,7 @@ st.session_state.user_input = current_input
 
 if submit and current_input.strip():
     try:
-        with st.spinner("Triaging your request..."):
+        with st.spinner("Identifying your request..."):
             result = triage_and_get_support_info(current_input.strip())
             st.session_state.triage_result = result
             st.session_state.show_email_draft = False
@@ -78,4 +78,4 @@ if st.session_state.triage_result:
             st.session_state.manual_send_clicked = True
 
         if st.session_state.manual_send_clicked:
-            st.markdown("No problem — feel free to copy the draft above and send it yourself.")
+            st.markdown("No problem - feel free to copy the draft above and send it yourself.")
