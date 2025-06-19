@@ -1,6 +1,29 @@
 import asyncio
 from pydantic import BaseModel
-from agents import Agent, Runner
+from agents import (
+    Agent,
+    Runner,
+    input_guardrail,
+    GuardrailFunctionOutput,
+    RunContextWrapper,
+    TResponseInputItem
+)
+
+class SupportResponse(BaseModel):
+    department: str
+    phone: str
+    email: str
+    other: str
+    note: str
+    hours: str
+    email_draft: str
+
+class DepartmentLabel(BaseModel):
+    department: str
+
+class OutOfScopeCheck(BaseModel):
+    is_off_topic: bool
+    explanation: str
 
 email_draft_agent = Agent(
     name="Email Draft Generator",
@@ -13,6 +36,28 @@ email_draft_agent = Agent(
     """,
     model="gpt-4o"
 )
+
+guardrail_filter_agent = Agent(
+    name="Out-of-Scope Filter",
+    instructions="""
+    Determine if the user’s message is off-topic for a radiology or IT support system.
+    Mark it as off-topic if it involves philosophical, spiritual, existential, cosmic, or abstract questions 
+    (e.g., 'meaning of life', 'is there a god', 'are we in a simulation').
+    Only mark it in-scope if it clearly relates to technical, clinical, or IT issues relevant to radiologists or hospital staff.
+    """,
+    output_type=OutOfScopeCheck,
+    model="gpt-4o"
+)
+
+@input_guardrail
+async def radiology_scope_guardrail(
+    ctx: RunContextWrapper[None], agent: Agent, input: str | list[TResponseInputItem]
+) -> GuardrailFunctionOutput:
+    result = await Runner.run(guardrail_filter_agent, input, context=ctx.context)
+    return GuardrailFunctionOutput(
+        output_info=result.final_output,
+        tripwire_triggered=result.final_output.is_off_topic
+    )
 
 hospital_rr_agent = Agent(
     name="Hospital Reading Rooms Agent",
@@ -37,18 +82,6 @@ radiqal_agent = Agent(
     instructions="Route QA/discrepancy reports (image labels, mismatches) needing Radiqal tool via PACS.",
     model="gpt-4o"
 )
-
-class SupportResponse(BaseModel):
-    department: str
-    phone: str
-    email: str
-    other: str
-    note: str
-    hours: str
-    email_draft: str
-
-class DepartmentLabel(BaseModel):
-    department: str
 
 SUPPORT_DIRECTORY = {
     "Hospital Reading Rooms": {
@@ -90,11 +123,12 @@ triage_agent = Agent(
     - WCINYP IT: Remote/home issues — VPN, Outlook, EPIC, email sync.
     - Radiqal: QA/discrepancy reports via Radiqal in Medicalis/VuePACS.
 
-    Respond with JSON: {"department": "Hospital Reading Rooms"}. No additional text.
+    Respond with JSON: {"department": "Hospital Reading Rooms"}
     """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
-    model="gpt-4o"
+    model="gpt-4o",
+    input_guardrails=[radiology_scope_guardrail]
 )
 
 def run_async_task(task):
