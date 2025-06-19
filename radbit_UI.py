@@ -1,6 +1,6 @@
 import streamlit as st
+from agents import set_default_openai_key, InputGuardrailTripwireTriggered
 from radbit import triage_and_get_support_info
-from agents import set_default_openai_key
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 
@@ -21,21 +21,32 @@ if "show_email_draft" not in st.session_state:
 if "last_submitted_input" not in st.session_state:
     st.session_state.last_submitted_input = ""
 
+if "manual_send_clicked" not in st.session_state:
+    st.session_state.manual_send_clicked = False
+
 current_input = st.text_area("Describe your issue", value=st.session_state.user_input, height=200)
 submit = st.button("Submit Request", use_container_width=True)
 
 if current_input.strip() != st.session_state.user_input.strip():
     st.session_state.triage_result = None
     st.session_state.show_email_draft = False
+    st.session_state.manual_send_clicked = False
 
 st.session_state.user_input = current_input
 
 if submit and current_input.strip():
-    with st.spinner("Triaging your request..."):
-        result = triage_and_get_support_info(current_input.strip())
-        st.session_state.triage_result = result
+    try:
+        with st.spinner("Triaging your request..."):
+            result = triage_and_get_support_info(current_input.strip())
+            st.session_state.triage_result = result
+            st.session_state.show_email_draft = False
+            st.session_state.last_submitted_input = current_input.strip()
+            st.session_state.manual_send_clicked = False
+    except InputGuardrailTripwireTriggered:
+        st.session_state.triage_result = None
         st.session_state.show_email_draft = False
-        st.session_state.last_submitted_input = current_input.strip()
+        st.session_state.manual_send_clicked = False
+        st.error("This tool only supports questions related to radiology support. Please enter a relevant issue.")
 
 if st.session_state.triage_result:
     result = st.session_state.triage_result
@@ -55,7 +66,7 @@ if st.session_state.triage_result:
 
     if st.session_state.show_email_draft:
         st.markdown("### Email Draft")
-        st.text_area("Edit at your discretion", value=result.email_draft, height=330)
+        st.text_area("Edit at your discretion", value=result.email_draft, height=330, key="email_draft_box")
 
         colA, colB = st.columns([1, 1])
         with colA:
@@ -64,4 +75,7 @@ if st.session_state.triage_result:
             send_myself = st.button("I'll Send It Myself")
 
         if send_myself:
+            st.session_state.manual_send_clicked = True
+
+        if st.session_state.manual_send_clicked:
             st.markdown("No problem — feel free to copy the draft above and send it yourself.")
