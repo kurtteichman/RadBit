@@ -107,8 +107,8 @@ SUPPORT_DIRECTORY = {
     },
     "Radiqal": {
         "phone": "N/A",
-        "email": "Use Radiqal within Medicalis/VuePACS",
-        "other": "Radiqal Tip Sheet guidance",
+        "email": "N/A - use Radiqal within Medicalis/VuePACS",
+        "other": "Use Radiqal Tip Sheet guidance",
         "note": "QA system support",
         "hours": "Platform dependent"
     },
