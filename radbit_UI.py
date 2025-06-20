@@ -27,7 +27,15 @@ if "history" not in st.session_state:
 
 st.title("Radiology Support Portal")
 st.markdown("Please describe your issue below and we’ll route you to the correct support group and provide contact options.")
-st.markdown('<style>textarea, .stTextInput, .stTextArea, .stSelectbox, .stButton > button { border: 1px solid #ccc; border-radius: 4px; }</style>', unsafe_allow_html=True)
+
+st.markdown('''
+<style>
+textarea, .stTextInput, .stTextArea, .stSelectbox, .stButton > button {
+    border: 1.5px solid #bbb;
+    border-radius: 4px;
+}
+</style>
+''', unsafe_allow_html=True)
 
 st.divider()
 left, right = st.columns([1.25, 1.75], gap="large")
@@ -84,7 +92,7 @@ with left:
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
         st.subheader("Email Draft")
-        st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
+        st.text_area(label="", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
         st.button("Send Email", disabled=True)
 
 st.divider()
