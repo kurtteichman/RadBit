@@ -100,4 +100,9 @@ with st.expander("Request History", expanded=False):
         with st.expander("View Recommended Support Contact"):
             info = entry['contact_info']
             for k, v in info.items():
+            if k == "Additional Info":
+                st.markdown(f"**{k}:**")
+            for line in v.split("\\n"):
+                st.markdown(line.strip())
+            else:
                 st.markdown(f"**{k}:** {v}")
