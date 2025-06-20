@@ -49,6 +49,14 @@ with left:
                 st.session_state.triage_result = result
                 st.session_state.show_email_draft = True
                 st.session_state.last_submitted_input = current_input.strip()
+                combined_info = ""
+                if result.other and result.other != "N/A":
+                    combined_info += result.other.strip()
+                if result.note and result.note != "N/A":
+                    if combined_info:
+                        combined_info += "\n" + result.note.strip()
+                    else:
+                        combined_info += result.note.strip()
                 entry = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "input": current_input.strip(),
@@ -58,7 +66,7 @@ with left:
                         "Phone": result.phone,
                         "Email": result.email,
                         "Availability": result.hours,
-                        "Additional Info": f"{result.other.strip()}\\n{result.note.strip()}".strip()
+                        "Additional Info": combined_info
                     }
                 }
                 st.session_state.history.append(entry)
@@ -68,41 +76,3 @@ with left:
             st.session_state.triage_result = None
             st.session_state.show_email_draft = False
             st.error("This tool only supports questions related to radiology support — please enter a relevant issue.")
-
-    if st.session_state.triage_result:
-        result = st.session_state.triage_result
-        st.markdown("### Recommended Support Contact")
-        st.markdown(f"**Department:** {result.department}")
-        st.markdown(f"**Phone:** {result.phone}")
-        st.markdown(f"**Email:** {result.email}")
-        st.markdown(f"**Availability:** {result.hours}")
-        if result.other.strip() or result.note.strip():
-            st.markdown("**Additional Info:**")
-            st.markdown(result.other.strip())
-            st.markdown(result.note.strip())
-
-with right:
-    if st.session_state.triage_result and st.session_state.show_email_draft:
-        st.subheader("Email Draft")
-        st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
-        st.button("Send Email", disabled=True)
-
-st.divider()
-with st.expander("Request History", expanded=False):
-    if st.button("Clear History"):
-        st.session_state.history = []
-        if os.path.exists(HISTORY_FILE):
-            os.remove(HISTORY_FILE)
-    for entry in reversed(st.session_state.history[-10:]):
-        st.markdown(f"**{entry['timestamp']}**")
-        st.markdown(f"- Input: {entry['input']}")
-        st.markdown(f"- Department: {entry['department']}")
-        with st.expander("View Recommended Support Contact"):
-            info = entry['contact_info']
-            for k, v in info.items():
-                if k == "Additional Info":
-                    st.markdown(f"**{k}:**")
-                    for line in v.split("\\n"):
-                        st.markdown(line.strip())
-                else:
-                    st.markdown(f"**{k}:** {v}")
