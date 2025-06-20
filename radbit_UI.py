@@ -1,3 +1,4 @@
+
 import json
 import os
 from datetime import datetime
@@ -25,16 +26,9 @@ if "history" not in st.session_state:
     else:
         st.session_state.history = []
 
-theme = st.sidebar.selectbox("Theme", ["Light", "Dark", "High Contrast"])
-if theme == "Dark":
-    st.write('<style>body{background-color:#1e1e1e;color:white;}</style>', unsafe_allow_html=True)
-elif theme == "High Contrast":
-    st.write('<style>body{background-color:white;color:black;font-weight:bold;}</style>', unsafe_allow_html=True)
-else:
-    st.write('<style>body{background-color:white;color:black;}</style>', unsafe_allow_html=True)
-
 st.title("Radiology Support Portal")
 st.markdown("Please describe your issue below and we’ll route you to the correct support group and provide contact options.")
+st.markdown('<style>textarea, .stTextInput, .stTextArea, .stSelectbox, .stButton > button { border: 1px solid #ccc; border-radius: 4px; }</style>', unsafe_allow_html=True)
 
 st.divider()
 left, right = st.columns([1.25, 1.75], gap="large")
@@ -91,20 +85,8 @@ with left:
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
         st.subheader("Email Draft")
-        draft = st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
-        btn_send = st.button("Send Email", disabled=True)
-        btn_copy = st.button("Copy to Clipboard")
-
-        if btn_copy:
-            st.write(
-                f"""
-                <script>
-                navigator.clipboard.writeText({json.dumps(draft)});
-                </script>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.success("Draft copied to clipboard")
+        st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
+        st.button("Send Email", disabled=True)
 
 st.divider()
 with st.expander("Request History", expanded=False):
@@ -113,7 +95,9 @@ with st.expander("Request History", expanded=False):
         if os.path.exists(HISTORY_FILE):
             os.remove(HISTORY_FILE)
     for entry in reversed(st.session_state.history[-10:]):
-        st.markdown(f"**{entry['timestamp']}**  \n• Input: {entry['input']}  \n• Department: {entry['department']}")
+        st.markdown(f"**{entry['timestamp']}**  
+• Input: {entry['input']}  
+• Department: {entry['department']}")
         with st.expander("View Recommended Support Contact"):
             info = entry['contact_info']
             for k, v in info.items():
