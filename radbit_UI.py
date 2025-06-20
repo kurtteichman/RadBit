@@ -25,7 +25,7 @@ if "history" not in st.session_state:
     else:
         st.session_state.history = []
 
-st.title("Radiology Support Portal")
+st.title("Radbit Support Portal")
 st.markdown("Please describe your issue below and we’ll route you to the correct support group and provide contact options.")
 
 st.divider()
