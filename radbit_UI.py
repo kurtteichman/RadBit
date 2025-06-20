@@ -57,9 +57,8 @@ with left:
                         "Department": result.department,
                         "Phone": result.phone,
                         "Email": result.email,
-                        "Other Info": result.other,
-                        "Note": result.note,
-                        "Availability": result.hours
+                        "Availability": result.hours,
+                        "Additional Info": f"{result.other.strip()}\\n{result.note.strip()}".strip()
                     }
                 }
                 st.session_state.history.append(entry)
@@ -76,9 +75,11 @@ with left:
         st.markdown(f"**Department:** {result.department}")
         st.markdown(f"**Phone:** {result.phone}")
         st.markdown(f"**Email:** {result.email}")
-        st.markdown(f"**Other Info:** {result.other}")
-        st.markdown(f"**Note:** {result.note}")
         st.markdown(f"**Availability:** {result.hours}")
+        if result.other.strip() or result.note.strip():
+            st.markdown("**Additional Info:**")
+            st.markdown(result.other.strip())
+            st.markdown(result.note.strip())
 
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
