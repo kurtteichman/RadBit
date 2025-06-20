@@ -1,4 +1,3 @@
-
 import json
 import os
 from datetime import datetime
@@ -95,9 +94,9 @@ with st.expander("Request History", expanded=False):
         if os.path.exists(HISTORY_FILE):
             os.remove(HISTORY_FILE)
     for entry in reversed(st.session_state.history[-10:]):
-        st.markdown(f"**{entry['timestamp']}**  
-• Input: {entry['input']}  
-• Department: {entry['department']}")
+        st.markdown(f"**{entry['timestamp']}**")
+        st.markdown(f"- Input: {entry['input']}")
+        st.markdown(f"- Department: {entry['department']}")
         with st.expander("View Recommended Support Contact"):
             info = entry['contact_info']
             for k, v in info.items():
