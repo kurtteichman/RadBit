@@ -34,9 +34,6 @@ textarea, .stTextInput, .stTextArea, .stSelectbox, .stButton > button {
     border: 1.5px solid #bbb;
     border-radius: 4px;
 }
-div[data-baseweb="textarea"] > div:first-child {
-    display: none;
-}
 </style>
 ''', unsafe_allow_html=True)
 
@@ -95,8 +92,7 @@ with left:
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
         st.subheader("Email Draft")
-        st.markdown("Edit before sending", unsafe_allow_html=True)
-        st.text_area(label="", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
+        st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
         st.button("Send Email", disabled=True)
 
 st.divider()
