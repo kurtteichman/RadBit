@@ -1,4 +1,6 @@
 import asyncio
+import json
+from datetime import datetime
 from pydantic import BaseModel
 from agents import (
     Agent,
@@ -17,6 +19,8 @@ class SupportResponse(BaseModel):
     note: str
     hours: str
     email_draft: str
+    warning: str | None = None
+    fallback_department: str | None = None
 
 class DepartmentLabel(BaseModel):
     department: str
@@ -28,11 +32,11 @@ class OutOfScopeCheck(BaseModel):
 email_draft_agent = Agent(
     name="Email Draft Generator",
     instructions="""
-    Write a conversational, polite email summarizing the user's issue.
-    Use a human tone: open with a neutral greeting like 'To whom it may concern' if no specific name is provided.
-    Include what happened, any steps they've already taken, and a request for help.
-    Close with something friendly like 'Thank you' and sign as '[Your Name]'.
-    Avoid headings, bullet points, or formal report formatting.
+    Write a polite, conversational email based on the user's issue and metadata.
+    Greet with "To whom it may concern" if no specific name is given.
+    Mention what happened, steps already taken, and what help is being sought.
+    Close with "Thank you" and sign with the user's name (given in metadata).
+    No headings or bullet points — just a simple email format.
     """,
     model="gpt-4o"
 )
@@ -40,48 +44,25 @@ email_draft_agent = Agent(
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
     instructions="""
-    Determine if the user’s message is off-topic for a radiology or IT support system.
-    Mark it as off-topic if it involves philosophical, spiritual, existential, cosmic, or abstract questions 
-    (e.g., 'meaning of life', 'is there a god', 'are we in a simulation').
-    Only mark it in-scope if it clearly relates to technical, clinical, or IT issues relevant to radiologists or hospital staff.
+    Flag philosophical or abstract questions (e.g., meaning of life, existence) as off-topic.
+    Only allow clinical/technical radiology or hospital-related support issues.
     """,
     output_type=OutOfScopeCheck,
     model="gpt-4o"
 )
 
 @input_guardrail
-async def radiology_scope_guardrail(
-    ctx: RunContextWrapper[None], agent: Agent, input: str | list[TResponseInputItem]
-) -> GuardrailFunctionOutput:
+async def radiology_scope_guardrail(ctx: RunContextWrapper[None], agent: Agent, input: str | list[TResponseInputItem]) -> GuardrailFunctionOutput:
     result = await Runner.run(guardrail_filter_agent, input, context=ctx.context)
     return GuardrailFunctionOutput(
         output_info=result.final_output,
         tripwire_triggered=result.final_output.is_off_topic
     )
 
-hospital_rr_agent = Agent(
-    name="Hospital Reading Rooms Agent",
-    instructions="Route clinical PACS/viewer issues during image interpretation (CT/MRI freezing, crashes).",
-    model="gpt-4o"
-)
-
-virtual_helpdesk_agent = Agent(
-    name="Virtual HelpDesk Agent",
-    instructions="Route general in-hospital desktop login or certificate issues, Zoom support available.",
-    model="gpt-4o"
-)
-
-wcinyp_agent = Agent(
-    name="WCINYP IT Agent",
-    instructions="Route remote/home access issues: VPN, Outlook, EPIC, or other systems not at hospital.",
-    model="gpt-4o"
-)
-
-radiqal_agent = Agent(
-    name="Radiqal Agent",
-    instructions="Route QA/discrepancy reports (image labels, mismatches) needing Radiqal tool via PACS.",
-    model="gpt-4o"
-)
+hospital_rr_agent = Agent(name="Hospital Reading Rooms Agent", instructions="Handle PACS/viewer issues during image interpretation.", model="gpt-4o")
+virtual_helpdesk_agent = Agent(name="Virtual HelpDesk Agent", instructions="In-hospital desktop login/certificates, Zoom help.", model="gpt-4o")
+wcinyp_agent = Agent(name="WCINYP IT Agent", instructions="Remote access: VPN, Outlook, EPIC, etc.", model="gpt-4o")
+radiqal_agent = Agent(name="Radiqal Agent", instructions="QA issues with Radiqal in PACS/Medicalis.", model="gpt-4o")
 
 SUPPORT_DIRECTORY = {
     "Hospital Reading Rooms": {
@@ -117,13 +98,13 @@ SUPPORT_DIRECTORY = {
 triage_agent = Agent(
     name="Support Triage Agent",
     instructions="""
-    Based on the user's description, pick exactly one department:
-    - Hospital Reading Rooms: PACS/image viewer freezing or crashes during CT/MRI interpretation.
-    - Virtual HelpDesk: In-hospital desktop login, certificate, or workstation issues (not PACS).
-    - WCINYP IT: Remote/home issues — VPN, Outlook, EPIC, email sync.
-    - Radiqal: QA/discrepancy reports via Radiqal in Medicalis/VuePACS.
+    Based on the user's description and metadata, choose one department:
+    - Hospital Reading Rooms: Viewer freezing, crashes.
+    - Virtual HelpDesk: In-hospital certificate/login issues.
+    - WCINYP IT: Remote workstation, VPN, Outlook problems.
+    - Radiqal: QA or discrepancy reports.
 
-    Respond with JSON: {"department": "Hospital Reading Rooms"}
+    Reply with JSON: {"department": "Hospital Reading Rooms"}
     """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
@@ -139,15 +120,47 @@ def run_async_task(task):
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(task)
 
-def triage_and_get_support_info(user_input: str) -> SupportResponse:
-    triage_result = run_async_task(Runner.run(triage_agent, user_input))
-    dept = triage_result.final_output.department
+def parse_hours_to_range(hours: str):
+    if hours.strip() == "24/7":
+        return None
+    import re
+    match = re.search(r"(\d{1,2})(?:\s*AM)?–(\d{1,2})(?:\s*PM)?", hours)
+    if match:
+        start_hour = int(match.group(1))
+        end_hour = int(match.group(2)) + 12 if int(match.group(2)) < 12 else int(match.group(2))
+        return start_hour, end_hour
+    return None
 
-    if dept not in SUPPORT_DIRECTORY:
+def triage_and_get_support_info(user_input: str, backend_json: dict) -> SupportResponse:
+    combined_input = {
+        "request": user_input,
+        "metadata": backend_json
+    }
+
+    triage_result = run_async_task(Runner.run(triage_agent, combined_input))
+    dept = triage_result.final_output.department
+    contact = SUPPORT_DIRECTORY.get(dept)
+    if not contact:
         raise ValueError(f"Unknown department returned: {dept}")
 
-    contact = SUPPORT_DIRECTORY[dept]
-    draft = run_async_task(Runner.run(email_draft_agent, user_input))
+    now = datetime.now()
+    warning = None
+    fallback = None
+
+    hours_range = parse_hours_to_range(contact["hours"])
+    if hours_range:
+        if not (hours_range[0] <= now.hour < hours_range[1]):
+            warning = f"{dept} is currently closed. Hours: {contact['hours']}."
+            for alt_dept, alt_info in SUPPORT_DIRECTORY.items():
+                if alt_dept != dept:
+                    alt_hours_range = parse_hours_to_range(alt_info["hours"])
+                    if alt_hours_range and alt_hours_range[0] <= now.hour < alt_hours_range[1]:
+                        fallback = alt_dept
+                        break
+
+    name = backend_json.get("user", {}).get("name", "[Your Name]")
+    draft_input = f"The following user ({name}) reports: {user_input}"
+    draft = run_async_task(Runner.run(email_draft_agent, draft_input))
 
     return SupportResponse(
         department=dept,
@@ -156,5 +169,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         other=contact["other"],
         note=contact["note"],
         hours=contact["hours"],
-        email_draft=draft.final_output
+        email_draft=draft.final_output,
+        warning=warning,
+        fallback_department=fallback
     )
