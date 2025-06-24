@@ -159,7 +159,7 @@ def parse_hours_string(hours_string):
             return None
     return None
 
-def load_backend_json(path="backend_examples.json", index=BACKEND_EXAMPLE_INDEX):
+def load_backend_json(path="fake_backend_data.json", index=BACKEND_EXAMPLE_INDEX):
     with open(path, "r") as f:
         examples = json.load(f)
     return examples[index]
