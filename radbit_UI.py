@@ -57,15 +57,15 @@ with left:
                         "Department": result.department,
                         "Phone": result.phone,
                         "Email": result.email,
-                        "Availability": result.hours,
-                        "Additional Info": "\n".join(
-                            filter(None, [
-                                result.other if result.other != "N/A" else "",
-                                result.note if result.note != "N/A" else ""
-                            ])
-                        )
+                        "Other Info": result.other,
+                        "Note": result.note,
+                        "Availability": result.hours
                     }
                 }
+                if result.unavailable_reason:
+                    entry["unavailable_reason"] = result.unavailable_reason
+                if result.secondary:
+                    entry["secondary"] = result.secondary
                 st.session_state.history.append(entry)
                 with open(HISTORY_FILE, "w") as f:
                     json.dump(st.session_state.history, f, indent=2)
@@ -80,16 +80,20 @@ with left:
         st.markdown(f"**Department:** {result.department}")
         st.markdown(f"**Phone:** {result.phone}")
         st.markdown(f"**Email:** {result.email}")
+        st.markdown(f"**Other Info:** {result.other}")
+        st.markdown(f"**Note:** {result.note}")
         st.markdown(f"**Availability:** {result.hours}")
-
-        other = result.other.strip() if result.other and result.other.strip() != "N/A" else ""
-        note = result.note.strip() if result.note and result.note.strip() != "N/A" else ""
-        combined_info = "\n".join(filter(None, [other, note]))
-
-        if combined_info:
-            st.markdown("**Additional Info:**")
-            for line in combined_info.split("\n"):
-                st.markdown(line.strip())
+        if result.unavailable_reason:
+            st.warning(f"The primary support group is currently unavailable: {result.unavailable_reason}")
+        if result.secondary:
+            st.markdown("---")
+            st.markdown("### Secondary Recommended Contact (Available Now)")
+            st.markdown(f"**Department:** {result.secondary['department']}")
+            st.markdown(f"**Phone:** {result.secondary['phone']}")
+            st.markdown(f"**Email:** {result.secondary['email']}")
+            st.markdown(f"**Other Info:** {result.secondary['other']}")
+            st.markdown(f"**Note:** {result.secondary['note']}")
+            st.markdown(f"**Availability:** {result.secondary['hours']}")
 
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
@@ -110,4 +114,15 @@ with st.expander("Request History", expanded=False):
         with st.expander("View Recommended Support Contact"):
             info = entry['contact_info']
             for k, v in info.items():
-                st.markdown(f"**{k}:** {v}")
+                if v and v != "N/A":
+                    st.markdown(f"**{k}:** {v}")
+            if "unavailable_reason" in entry:
+                st.warning(f"Unavailable: {entry['unavailable_reason']}")
+            if "secondary" in entry:
+                st.markdown("---")
+                st.markdown(f"**Secondary Contact:** {entry['secondary']['department']}")
+                st.markdown(f"**Phone:** {entry['secondary']['phone']}")
+                st.markdown(f"**Email:** {entry['secondary']['email']}")
+                st.markdown(f"**Other Info:** {entry['secondary']['other']}")
+                st.markdown(f"**Note:** {entry['secondary']['note']}")
+                st.markdown(f"**Availability:** {entry['secondary']['hours']}")
