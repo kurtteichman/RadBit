@@ -12,6 +12,8 @@ from agents import (
 )
 import holidays
 
+BACKEND_EXAMPLE_INDEX = 2 
+
 class SupportResponse(BaseModel):
     department: str
     phone: str
@@ -157,9 +159,10 @@ def parse_hours_string(hours_string):
             return None
     return None
 
-def load_backend_json(path="fake_backend_example3.json"):
+def load_backend_json(path="backend_examples.json", index=BACKEND_EXAMPLE_INDEX):
     with open(path, "r") as f:
-        return json.load(f)
+        examples = json.load(f)
+    return examples[index]
 
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     backend = load_backend_json()
