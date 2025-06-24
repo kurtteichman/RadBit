@@ -18,6 +18,7 @@ class SupportResponse(BaseModel):
     note: str
     hours: str
     email_draft: str
+    support_available: bool = True
     fallback_department: str | None = None
 
 class DepartmentLabel(BaseModel):
