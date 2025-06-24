@@ -53,19 +53,16 @@ with left:
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "input": current_input.strip(),
                     "department": result.department,
+                    "fallback_department": result.fallback_department if hasattr(result, "fallback_department") else "",
+                    "support_available": result.support_available if hasattr(result, "support_available") else True,
                     "contact_info": {
                         "Department": result.department,
                         "Phone": result.phone,
                         "Email": result.email,
-                        "Other Info": result.other,
-                        "Note": result.note,
+                        "Additional Info": result.other if result.other != "N/A" else "",
                         "Availability": result.hours
                     }
                 }
-                if result.unavailable_reason:
-                    entry["unavailable_reason"] = result.unavailable_reason
-                if result.secondary:
-                    entry["secondary"] = result.secondary
                 st.session_state.history.append(entry)
                 with open(HISTORY_FILE, "w") as f:
                     json.dump(st.session_state.history, f, indent=2)
@@ -80,20 +77,11 @@ with left:
         st.markdown(f"**Department:** {result.department}")
         st.markdown(f"**Phone:** {result.phone}")
         st.markdown(f"**Email:** {result.email}")
-        st.markdown(f"**Other Info:** {result.other}")
-        st.markdown(f"**Note:** {result.note}")
+        if result.other != "N/A":
+            st.markdown(f"**Additional Info:** {result.other}")
         st.markdown(f"**Availability:** {result.hours}")
-        if result.unavailable_reason:
-            st.warning(f"The primary support group is currently unavailable: {result.unavailable_reason}")
-        if result.secondary:
-            st.markdown("---")
-            st.markdown("### Secondary Recommended Contact (Available Now)")
-            st.markdown(f"**Department:** {result.secondary['department']}")
-            st.markdown(f"**Phone:** {result.secondary['phone']}")
-            st.markdown(f"**Email:** {result.secondary['email']}")
-            st.markdown(f"**Other Info:** {result.secondary['other']}")
-            st.markdown(f"**Note:** {result.secondary['note']}")
-            st.markdown(f"**Availability:** {result.secondary['hours']}")
+        if not result.support_available and hasattr(result, "fallback_department") and result.fallback_department:
+            st.warning(f"{result.department} is currently unavailable. We've suggested {result.fallback_department} as an alternate support contact.")
 
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
@@ -111,18 +99,10 @@ with st.expander("Request History", expanded=False):
         st.markdown(f"**{entry['timestamp']}**")
         st.markdown(f"- Input: {entry['input']}")
         st.markdown(f"- Department: {entry['department']}")
+        if entry.get("fallback_department"):
+            st.markdown(f"- Fallback Department: {entry['fallback_department']}")
         with st.expander("View Recommended Support Contact"):
             info = entry['contact_info']
             for k, v in info.items():
-                if v and v != "N/A":
+                if v:
                     st.markdown(f"**{k}:** {v}")
-            if "unavailable_reason" in entry:
-                st.warning(f"Unavailable: {entry['unavailable_reason']}")
-            if "secondary" in entry:
-                st.markdown("---")
-                st.markdown(f"**Secondary Contact:** {entry['secondary']['department']}")
-                st.markdown(f"**Phone:** {entry['secondary']['phone']}")
-                st.markdown(f"**Email:** {entry['secondary']['email']}")
-                st.markdown(f"**Other Info:** {entry['secondary']['other']}")
-                st.markdown(f"**Note:** {entry['secondary']['note']}")
-                st.markdown(f"**Availability:** {entry['secondary']['hours']}")
