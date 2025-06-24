@@ -3,3 +3,4 @@ openai
 openai-agents
 pydantic
 nest_asyncio
+holidays
