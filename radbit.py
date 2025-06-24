@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import datetime
 from pydantic import BaseModel
 from agents import (
@@ -9,6 +10,7 @@ from agents import (
     RunContextWrapper,
     TResponseInputItem
 )
+import holidays
 
 class SupportResponse(BaseModel):
     department: str
@@ -155,38 +157,49 @@ def parse_hours_string(hours_string):
             return None
     return None
 
+def load_backend_json(path="fake_backend_example3.json"):
+    with open(path, "r") as f:
+        return json.load(f)
+
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
-    backend = {
-        "user": {
-            "name": "Jamie Lee"
-        },
-        "timestamp": {
-            "time": "07:48:55 EST"
-        }
-    }
+    backend = load_backend_json()
+    name = backend["user"]["name"]
+    time_str = backend["timestamp"]["time"]
+    date_str = backend["timestamp"]["date"]
+    day_of_week = backend["timestamp"]["day_of_week"]
+    is_weekend_or_holiday = backend["timestamp"]["is_weekend_or_holiday"].lower() == "yes"
 
     triage_result = run_async_task(Runner.run(triage_agent, user_input))
     dept = triage_result.final_output.department
     contact = SUPPORT_DIRECTORY[dept]
 
-    now = datetime.now().astimezone().strftime("%H:%M")
-    current_time = datetime.strptime(now, "%H:%M")
-    time_range = parse_hours_string(contact["hours"])
+    support_available = True
     fallback = None
 
-    if time_range:
+    if contact["hours"].strip() != "24/7":
+        time_range = parse_hours_string(contact["hours"])
+        try:
+            now = datetime.strptime(time_str.split()[0], "%H:%M:%S")
+        except:
+            now = datetime.strptime("12:00:00", "%H:%M:%S")
         start = datetime.strptime(time_range[0], "%H:%M")
         end = datetime.strptime(time_range[1], "%H:%M")
-        if not (start <= current_time <= end):
+
+        us_holidays = holidays.US()
+        is_holiday = date_str in us_holidays
+
+        if not (start <= now <= end) or day_of_week in ["Sat", "Sun"] or is_weekend_or_holiday or is_holiday:
+            support_available = False
             for alt_dept, details in SUPPORT_DIRECTORY.items():
-                if alt_dept != dept and parse_hours_string(details["hours"]):
-                    alt_start, alt_end = map(lambda t: datetime.strptime(t, "%H:%M"), parse_hours_string(details["hours"]))
-                    if alt_start <= current_time <= alt_end:
+                if alt_dept != dept and details["hours"].strip() != "24/7":
+                    range_ = parse_hours_string(details["hours"])
+                    alt_start, alt_end = datetime.strptime(range_[0], "%H:%M"), datetime.strptime(range_[1], "%H:%M")
+                    if alt_start <= now <= alt_end:
                         fallback = alt_dept
                         break
 
-    email_input = user_input + f" Please sign the email as {backend['user']['name']}."
-    draft = run_async_task(Runner.run(email_draft_agent, email_input))
+    draft_prompt = user_input + f" Please sign the email as {name}."
+    draft = run_async_task(Runner.run(email_draft_agent, draft_prompt))
 
     return SupportResponse(
         department=dept,
@@ -196,5 +209,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         note=contact["note"],
         hours=contact["hours"],
         email_draft=draft.final_output,
+        support_available=support_available,
         fallback_department=fallback
     )
