@@ -53,13 +53,12 @@ with left:
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "input": current_input.strip(),
                     "department": result.department,
-                    "fallback_department": result.fallback_department if hasattr(result, "fallback_department") else "",
-                    "support_available": result.support_available if hasattr(result, "support_available") else True,
                     "contact_info": {
                         "Department": result.department,
                         "Phone": result.phone,
                         "Email": result.email,
-                        "Additional Info": result.other if result.other != "N/A" else "",
+                        "Other Info": result.other,
+                        "Note": result.note,
                         "Availability": result.hours
                     }
                 }
@@ -77,11 +76,13 @@ with left:
         st.markdown(f"**Department:** {result.department}")
         st.markdown(f"**Phone:** {result.phone}")
         st.markdown(f"**Email:** {result.email}")
-        if result.other != "N/A":
-            st.markdown(f"**Additional Info:** {result.other}")
+        st.markdown(f"**Other Info:** {result.other}")
+        st.markdown(f"**Note:** {result.note}")
         st.markdown(f"**Availability:** {result.hours}")
-        if not result.support_available and hasattr(result, "fallback_department") and result.fallback_department:
-            st.warning(f"{result.department} is currently unavailable. We've suggested {result.fallback_department} as an alternate support contact.")
+        if not result.support_available:
+            st.warning("This department is currently unavailable based on the time or holiday schedule.")
+            if result.fallback_department:
+                st.info(f"Recommended alternative: **{result.fallback_department}** (currently available)")
 
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
@@ -99,10 +100,8 @@ with st.expander("Request History", expanded=False):
         st.markdown(f"**{entry['timestamp']}**")
         st.markdown(f"- Input: {entry['input']}")
         st.markdown(f"- Department: {entry['department']}")
-        if entry.get("fallback_department"):
-            st.markdown(f"- Fallback Department: {entry['fallback_department']}")
         with st.expander("View Recommended Support Contact"):
             info = entry['contact_info']
             for k, v in info.items():
-                if v:
+                if v and v != "N/A":
                     st.markdown(f"**{k}:** {v}")
