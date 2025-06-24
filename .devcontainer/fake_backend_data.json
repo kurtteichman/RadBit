@@ -1,0 +1,101 @@
+[
+  {
+    "timestamp": {
+      "date": "2025-06-24",
+      "day_of_week": "Tue",
+      "is_weekend_or_holiday": "No",
+      "time": "09:15:42 EST"
+    },
+    "user": {
+      "name": "George Siim",
+      "cwid": "ges9005",
+      "email": "ges9005@med.cornell.edu",
+      "radiologist_subspecialty": "Body",
+      "role": "Attending"
+    },
+    "it_context": {
+      "ip_address": "10.10.100.5",
+      "location": "WCI-Starr",
+      "phone_number": "212-776-2630",
+      "vpn": "No",
+      "browser_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+      "pacs_version": "12.2.8.310.0012",
+      "medicalis_version": "8.65.03",
+      "fluency_version": "4.40.10.4285",
+      "os_version": "Windows 11 Pro, NYP Image Version 2025-06-01"
+    },
+    "study": {
+      "mrn": "M19572938472",
+      "accession": "A91283746573",
+      "study_type": "Inpatient",
+      "study_name": "CT chest with contrast",
+      "clinical_information": "Suspected PE, elevated D-dimer"
+    }
+  },
+  {
+    "timestamp": {
+      "date": "2025-06-22",
+      "day_of_week": "Sun",
+      "is_weekend_or_holiday": "Yes",
+      "time": "14:33:09 EST"
+    },
+    "user": {
+      "name": "Dana Kim",
+      "cwid": "dka2031",
+      "email": "dka2031@med.cornell.edu",
+      "radiologist_subspecialty": "Neuro",
+      "role": "Fellow"
+    },
+    "it_context": {
+      "ip_address": "192.168.45.201",
+      "location": "VPN",
+      "phone_number": "917-555-2012",
+      "vpn": "Yes",
+      "browser_user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+      "pacs_version": "12.2.8.310.0012",
+      "medicalis_version": "8.65.03",
+      "fluency_version": "4.40.10.4285",
+      "os_version": "macOS Sonoma 14.0"
+    },
+    "study": {
+      "mrn": "M38402917483",
+      "accession": "A84736291028",
+      "study_type": "ED",
+      "study_name": "MRI brain with and without contrast",
+      "clinical_information": "Acute altered mental status, rule out stroke"
+    }
+  },
+  {
+    "timestamp": {
+      "date": "2025-07-04",
+      "day_of_week": "Fri",
+      "is_weekend_or_holiday": "Yes",
+      "time": "07:48:55 EST"
+    },
+    "user": {
+      "name": "Jamie Lee",
+      "cwid": "jkl4523",
+      "email": "jkl4523@med.cornell.edu",
+      "radiologist_subspecialty": "MSK",
+      "role": "Resident"
+    },
+    "it_context": {
+      "ip_address": "10.10.25.18",
+      "location": "WCINYP",
+      "phone_number": "212-305-7890",
+      "vpn": "No",
+      "browser_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+      "pacs_version": "12.2.8.310.0012",
+      "medicalis_version": "8.65.03",
+      "fluency_version": "4.40.10.4285",
+      "os_version": "Windows 11 Pro, NYP Image Version 2025-06-01"
+    },
+    "study": {
+      "mrn": "M11178392834",
+      "accession": "A12837455612",
+      "study_type": "Outpatient",
+      "study_name": "X-ray left knee 3 views",
+      "clinical_information": "Chronic knee pain, rule out osteoarthritis"
+    }
+  }
+]
