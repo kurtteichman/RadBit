@@ -59,7 +59,9 @@ with left:
                         "Email": result.email,
                         "Other Info": result.other,
                         "Note": result.note,
-                        "Availability": result.hours
+                        "Availability": result.hours,
+                        "Support Available": "Yes" if result.support_available else "No",
+                        "Fallback": result.fallback_department or "None"
                     }
                 }
                 st.session_state.history.append(entry)
@@ -69,6 +71,8 @@ with left:
             st.session_state.triage_result = None
             st.session_state.show_email_draft = False
             st.error("This tool only supports questions related to radiology support — please enter a relevant issue.")
+        except Exception as e:
+            st.error(f"An unexpected error occurred: {e}")
 
     if st.session_state.triage_result:
         result = st.session_state.triage_result
