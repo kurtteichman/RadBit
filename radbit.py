@@ -12,7 +12,8 @@ from agents import (
 )
 import holidays
 
-BACKEND_EXAMPLE_INDEX = 2 
+# Easily switch backend example by changing this index (0, 1, or 2)
+BACKEND_EXAMPLE_INDEX = 2
 
 class SupportResponse(BaseModel):
     department: str
@@ -160,12 +161,21 @@ def parse_hours_string(hours_string):
     return None
 
 def load_backend_json(path="fake_backend_data.json", index=BACKEND_EXAMPLE_INDEX):
-    with open(path, "r") as f:
-        examples = json.load(f)
-    return examples[index]
+    try:
+        with open(path, "r") as f:
+            examples = json.load(f)
+        if not isinstance(examples, list) or index >= len(examples):
+            raise IndexError("Invalid index for backend data.")
+        return examples[index]
+    except Exception as e:
+        print(f"[ERROR] Failed to load backend data: {e}")
+        return None
 
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     backend = load_backend_json()
+    if backend is None:
+        raise ValueError("Could not load backend data.")
+
     name = backend["user"]["name"]
     time_str = backend["timestamp"]["time"]
     date_str = backend["timestamp"]["date"]
