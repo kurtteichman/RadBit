@@ -12,8 +12,7 @@ from agents import (
 )
 import holidays
 
-# 🔧 Change this index to switch backend examples (0 = George, 1 = Dana, 2 = Jamie)
-BACKEND_EXAMPLE_INDEX = 2
+BACKEND_EXAMPLE_INDEX = 2  # <- Change this index to 0, 1, or 2 to use different fake backend examples
 
 class SupportResponse(BaseModel):
     department: str
@@ -175,9 +174,9 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     triage_result = run_async_task(Runner.run(triage_agent, user_input))
 
-    # Defensive check to prevent NoneType errors
-    if triage_result.final_output is None:
-        raise ValueError("Triage failed to determine a department. Final output is None.")
+    # Add defensive check
+    if triage_result.final_output is None or not hasattr(triage_result.final_output, "department"):
+        raise ValueError("The triage agent did not return a valid department.")
 
     dept = triage_result.final_output.department
     contact = SUPPORT_DIRECTORY[dept]
@@ -202,8 +201,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
             for alt_dept, details in SUPPORT_DIRECTORY.items():
                 if alt_dept != dept and details["hours"].strip() != "24/7":
                     range_ = parse_hours_string(details["hours"])
-                    if not range_:
-                        continue
                     alt_start, alt_end = datetime.strptime(range_[0], "%H:%M"), datetime.strptime(range_[1], "%H:%M")
                     if alt_start <= now <= alt_end:
                         fallback = alt_dept
