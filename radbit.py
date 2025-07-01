@@ -12,7 +12,7 @@ from agents import (
 )
 import holidays
 
-# Easily switch backend example by changing this index (0, 1, or 2)
+# 🔧 Change this index to switch backend examples (0 = George, 1 = Dana, 2 = Jamie)
 BACKEND_EXAMPLE_INDEX = 2
 
 class SupportResponse(BaseModel):
@@ -161,21 +161,12 @@ def parse_hours_string(hours_string):
     return None
 
 def load_backend_json(path="fake_backend_data.json", index=BACKEND_EXAMPLE_INDEX):
-    try:
-        with open(path, "r") as f:
-            examples = json.load(f)
-        if not isinstance(examples, list) or index >= len(examples):
-            raise IndexError("Invalid index for backend data.")
-        return examples[index]
-    except Exception as e:
-        print(f"[ERROR] Failed to load backend data: {e}")
-        return None
+    with open(path, "r") as f:
+        examples = json.load(f)
+    return examples[index]
 
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     backend = load_backend_json()
-    if backend is None:
-        raise ValueError("Could not load backend data.")
-
     name = backend["user"]["name"]
     time_str = backend["timestamp"]["time"]
     date_str = backend["timestamp"]["date"]
@@ -183,6 +174,11 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     is_weekend_or_holiday = backend["timestamp"]["is_weekend_or_holiday"].lower() == "yes"
 
     triage_result = run_async_task(Runner.run(triage_agent, user_input))
+
+    # Defensive check to prevent NoneType errors
+    if triage_result.final_output is None:
+        raise ValueError("Triage failed to determine a department. Final output is None.")
+
     dept = triage_result.final_output.department
     contact = SUPPORT_DIRECTORY[dept]
 
@@ -206,6 +202,8 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
             for alt_dept, details in SUPPORT_DIRECTORY.items():
                 if alt_dept != dept and details["hours"].strip() != "24/7":
                     range_ = parse_hours_string(details["hours"])
+                    if not range_:
+                        continue
                     alt_start, alt_end = datetime.strptime(range_[0], "%H:%M"), datetime.strptime(range_[1], "%H:%M")
                     if alt_start <= now <= alt_end:
                         fallback = alt_dept
