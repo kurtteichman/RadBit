@@ -12,7 +12,7 @@ from agents import (
 )
 import holidays
 
-BACKEND_EXAMPLE_INDEX = 2  # <- Change this index to 0, 1, or 2 to use different fake backend examples
+BACKEND_EXAMPLE_INDEX = 2  # Change this index to switch between backend examples
 
 class SupportResponse(BaseModel):
     department: str
@@ -130,7 +130,9 @@ triage_agent = Agent(
     - Virtual HelpDesk: In-hospital desktop login, certificate, or workstation issues (not PACS).
     - WCINYP IT: Remote/home issues — VPN, Outlook, EPIC, email sync.
     - Radiqal: QA/discrepancy reports via Radiqal in Medicalis/VuePACS.
-    Respond with JSON: {"department": "Hospital Reading Rooms"}
+
+    Always respond ONLY with valid JSON in this format: {"department": "WCINYP IT"}.
+    Do not explain or add extra text.
     """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
@@ -174,12 +176,14 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     triage_result = run_async_task(Runner.run(triage_agent, user_input))
 
-    # Add defensive check
-    if triage_result.final_output is None or not hasattr(triage_result.final_output, "department"):
-        raise ValueError("The triage agent did not return a valid department.")
+    # Defensive handling of None responses
+    if not triage_result.final_output or not hasattr(triage_result.final_output, "department"):
+        raise ValueError(f"Support triage failed — no department returned. Full response: {triage_result}")
 
     dept = triage_result.final_output.department
-    contact = SUPPORT_DIRECTORY[dept]
+    contact = SUPPORT_DIRECTORY.get(dept)
+    if contact is None:
+        raise ValueError(f"No contact info found for department: {dept}")
 
     support_available = True
     fallback = None
