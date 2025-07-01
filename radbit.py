@@ -175,6 +175,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     is_weekend_or_holiday = backend["timestamp"]["is_weekend_or_holiday"].lower() == "yes"
 
     triage_result = run_async_task(Runner.run(triage_agent, user_input))
+    print("DEBUG — Triage agent full output:", triage_result)
 
     # Defensive handling of None responses
     if not triage_result.final_output or not hasattr(triage_result.final_output, "department"):
