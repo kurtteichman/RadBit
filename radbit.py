@@ -168,8 +168,6 @@ def load_backend_json(path="fake_backend_data.json", index=BACKEND_EXAMPLE_INDEX
 
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     backend = load_backend_json()
-    print("DEBUG — Backend:", backend)
-
     name = backend["user"]["name"]
     time_str = backend["timestamp"]["time"]
     date_str = backend["timestamp"]["date"]
@@ -177,10 +175,11 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     is_weekend_or_holiday = backend["timestamp"]["is_weekend_or_holiday"].lower() == "yes"
 
     triage_result = run_async_task(Runner.run(triage_agent, user_input))
-    print("DEBUG — Triage result full object:", triage_result)
-    print("DEBUG — Final output:", triage_result.final_output)
+    print("DEBUG — Triage agent full output:", triage_result)
 
+    # New debug check added here
     if not triage_result.final_output or not hasattr(triage_result.final_output, "department"):
+        print("❌ Triage returned None or missing department:", triage_result)
         raise ValueError(f"Support triage failed — no department returned. Full response: {triage_result}")
 
     dept = triage_result.final_output.department
