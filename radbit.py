@@ -2,17 +2,18 @@ import asyncio
 import json
 from datetime import datetime
 from pydantic import BaseModel
+import streamlit as st  # For debugging output in Streamlit UI
 from agents import (
     Agent,
     Runner,
     input_guardrail,
     GuardrailFunctionOutput,
     RunContextWrapper,
-    TResponseInputItem
+    TResponseInputItem,
 )
 import holidays
 
-BACKEND_EXAMPLE_INDEX = 2  # Change this index to switch between backend examples
+BACKEND_EXAMPLE_INDEX = 2  # Change this index to test different backend cases
 
 class SupportResponse(BaseModel):
     department: str
@@ -175,16 +176,19 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     is_weekend_or_holiday = backend["timestamp"]["is_weekend_or_holiday"].lower() == "yes"
 
     triage_result = run_async_task(Runner.run(triage_agent, user_input))
-    print("DEBUG — Triage agent full output:", triage_result)
 
-    # New debug check added here
+    # Streamlit debugging output
+    st.write("📤 Triage result:", triage_result)
+
     if not triage_result.final_output or not hasattr(triage_result.final_output, "department"):
-        print("❌ Triage returned None or missing department:", triage_result)
-        raise ValueError(f"Support triage failed — no department returned. Full response: {triage_result}")
+        st.error("❌ Error: triage agent returned None or missing department.")
+        st.write("Full triage object:", triage_result)
+        raise ValueError("Support triage failed — no department returned.")
 
     dept = triage_result.final_output.department
     contact = SUPPORT_DIRECTORY.get(dept)
     if contact is None:
+        st.error(f"❌ Error: Department '{dept}' not found in SUPPORT_DIRECTORY.")
         raise ValueError(f"No contact info found for department: {dept}")
 
     support_available = True
