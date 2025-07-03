@@ -2,6 +2,7 @@ import asyncio
 import json
 from datetime import datetime
 from pydantic import BaseModel
+from openai import OpenAI
 from agents import (
     Agent,
     Runner,
@@ -11,11 +12,11 @@ from agents import (
     TResponseInputItem,
 )
 import holidays
-import openai
 
-# If you’ve called set_default_openai_key(...) in your UI, openai.api_key is already set.
+BACKEND_EXAMPLE_INDEX = 2  # change to 0,1,2 to pick a different example
 
-BACKEND_EXAMPLE_INDEX = 2  # Change to 0,1,2 to pick among your three fake-backend entries
+# instantiate the new client (it will read OPENAI_API_KEY from env)
+client = OpenAI()
 
 class SupportResponse(BaseModel):
     department: str
@@ -36,25 +37,23 @@ class OutOfScopeCheck(BaseModel):
     explanation: str
 
 def generate_email_draft(issue: str, user_name: str) -> str:
-    system = {
-        "role": "system",
-        "content": f"""
-You are a professional assistant that writes polite, conversational support request emails.
+    msgs = [
+        {
+            "role": "system",
+            "content": f"""You are a professional assistant that writes polite, conversational support request emails.
 Open with "To whom it may concern," if no recipient name is known.
 Summarize the issue described by the user below.
 Close with "Thank you" and sign as "{user_name}".
-Avoid bullet lists or formal report formatting; write in natural prose.
-""".strip()
-    }
-    user = {"role": "user", "content": issue}
-    resp = openai.ChatCompletion.create(
+Avoid bullet lists or formal report formatting; write in natural prose."""
+        },
+        {"role": "user", "content": issue},
+    ]
+    resp = client.chat.completions.create(
         model="gpt-4o",
-        messages=[system, user],
+        messages=msgs,
         temperature=0.5,
     )
     return resp.choices[0].message.content.strip()
-
-email_draft_agent = None  # no longer used
 
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
@@ -72,10 +71,10 @@ async def radiology_scope_guardrail(
     agent: Agent,
     input: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
-    result = await Runner.run(guardrail_filter_agent, input, context=ctx.context)
+    out = await Runner.run(guardrail_filter_agent, input, context=ctx.context)
     return GuardrailFunctionOutput(
-        output_info=result.final_output,
-        tripwire_triggered=result.final_output.is_off_topic,
+        output_info=out.final_output,
+        tripwire_triggered=out.final_output.is_off_topic,
     )
 
 hospital_rr_agent = Agent(
@@ -134,11 +133,16 @@ triage_agent = Agent(
     name="Support Triage Agent",
     instructions="""
 Based on the user's description and context (subspecialty, time, location),
-choose exactly one department. Respond **only** with JSON like:
+choose exactly one department. Reply **only** with JSON like:
 {"department": "Hospital Reading Rooms"}
 """,
     output_type=DepartmentLabel,
-    handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
+    handoffs=[
+        hospital_rr_agent,
+        virtual_helpdesk_agent,
+        wcinyp_agent,
+        radiqal_agent,
+    ],
     model="gpt-4o",
     input_guardrails=[radiology_scope_guardrail],
 )
@@ -156,11 +160,11 @@ def parse_hours_string(hours_string: str):
     if s == "24/7":
         return ("00:00", "23:59")
     if "," in s:
-        _, time_part = s.split(",", 1)
-        s = time_part.strip()
+        _, part = s.split(",", 1)
+        s = part.strip()
     if "–" in s:
         a, b = s.split("–", 1)
-        clean = lambda t: t.replace(" ", "").replace(" ", "")
+        clean = lambda t: t.replace(" ","").replace(" ","")
         try:
             return (
                 datetime.strptime(clean(a), "%I%p").strftime("%H:%M"),
@@ -180,11 +184,11 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     user_meta = backend["user"]
     ts_meta   = backend["timestamp"]
 
-    name       = user_meta["name"]
-    time_str   = ts_meta["time"].split()[0]
-    date_str   = ts_meta["date"]
-    dow        = ts_meta["day_of_week"]
-    weekend_or = ts_meta["is_weekend_or_holiday"].lower() == "yes"
+    name     = user_meta["name"]
+    t_str    = ts_meta["time"].split()[0]
+    date_str = ts_meta["date"]
+    dow      = ts_meta["day_of_week"]
+    weekend  = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
     # 1) triage
     tri = run_async_task(Runner.run(triage_agent, user_input))
@@ -194,9 +198,9 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     info = SUPPORT_DIRECTORY[dept]
 
-    # 2) availability
-    now = datetime.strptime(time_str, "%H:%M:%S")
-    support_ok = True
+    # 2) availability/fallback
+    now = datetime.strptime(t_str, "%H:%M:%S")
+    ok = True
     fallback = None
     if info["hours"] != "24/7":
         rng = parse_hours_string(info["hours"])
@@ -204,8 +208,8 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
             start = datetime.strptime(rng[0], "%H:%M")
             end   = datetime.strptime(rng[1], "%H:%M")
             is_hol = date_str in holidays.US()
-            if not (start <= now <= end) or dow in ("Sat","Sun") or weekend_or or is_hol:
-                support_ok = False
+            if not (start <= now <= end) or dow in ("Sat","Sun") or weekend or is_hol:
+                ok = False
                 for alt, alt_info in SUPPORT_DIRECTORY.items():
                     if alt == dept or alt_info["hours"] == "24/7":
                         continue
@@ -217,7 +221,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    # 3) email draft via direct API call
+    # 3) email draft via clean string
     draft = generate_email_draft(user_input, name)
 
     return SupportResponse(
@@ -228,6 +232,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         note=info["note"],
         hours=info["hours"],
         email_draft=draft,
-        support_available=support_ok,
+        support_available=ok,
         fallback_department=fallback,
     )
