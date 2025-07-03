@@ -8,12 +8,11 @@ from agents import (
     input_guardrail,
     GuardrailFunctionOutput,
     RunContextWrapper,
-    TResponseInputItem
+    TResponseInputItem,
 )
 import holidays
-import streamlit as st
 
-BACKEND_EXAMPLE_INDEX = 2  # Change this to 0, 1, or 2 to pick one of the three fake-backend entries
+BACKEND_EXAMPLE_INDEX = 2  # set to 0, 1, or 2 to pick the JSON entry
 
 class SupportResponse(BaseModel):
     department: str
@@ -26,6 +25,9 @@ class SupportResponse(BaseModel):
     support_available: bool = True
     fallback_department: str | None = None
 
+class DepartmentLabel(BaseModel):
+    department: str
+
 class OutOfScopeCheck(BaseModel):
     is_off_topic: bool
     explanation: str
@@ -34,10 +36,10 @@ email_draft_agent = Agent(
     name="Email Draft Generator",
     instructions="""
 Write a conversational, polite email summarizing the user's issue.
-Use a human tone: open with a neutral greeting like 'To whom it may concern' if no specific name is provided.
-Include what happened, any steps they've already taken, and a request for help.
-Close with something friendly like 'Thank you' and sign as '{user_name}'.
-Avoid headings, bullet points, or formal report formatting.
+Use a human tone, opening with 'To whom it may concern' if no name is known.
+Include what happened, any steps taken, and a request for help.
+Close with 'Thank you' and sign as '{user_name}'.
+Avoid bullet lists or formal report style.
 """,
     model="gpt-4o"
 )
@@ -45,10 +47,8 @@ Avoid headings, bullet points, or formal report formatting.
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
     instructions="""
-Determine if the user’s message is off-topic for a radiology or IT support system.
-Mark it as off-topic if it involves philosophical, spiritual, existential, cosmic, or abstract questions 
-(e.g., 'meaning of life', 'is there a god', 'are we in a simulation').
-Only mark it in-scope if it clearly relates to technical, clinical, or IT issues relevant to radiologists or hospital staff.
+Detect if the user's message is off-topic (philosophical, existential, etc.).
+Only allow through clear radiology/IT support requests.
 """,
     output_type=OutOfScopeCheck,
     model="gpt-4o"
@@ -56,36 +56,35 @@ Only mark it in-scope if it clearly relates to technical, clinical, or IT issues
 
 @input_guardrail
 async def radiology_scope_guardrail(
-    ctx: RunContextWrapper[None], agent: Agent, input: str | list[TResponseInputItem]
+    ctx: RunContextWrapper[None],
+    agent: Agent,
+    input: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
     result = await Runner.run(guardrail_filter_agent, input, context=ctx.context)
     return GuardrailFunctionOutput(
         output_info=result.final_output,
-        tripwire_triggered=result.final_output.is_off_topic
+        tripwire_triggered=result.final_output.is_off_topic,
     )
 
 hospital_rr_agent = Agent(
     name="Hospital Reading Rooms Agent",
-    instructions="Route clinical PACS/viewer issues during image interpretation (CT/MRI freezing, crashes).",
-    model="gpt-4o"
+    instructions="Handle clinical PACS/viewer crashes or freezes during CT/MRI interpretation.",
+    model="gpt-4o",
 )
-
 virtual_helpdesk_agent = Agent(
     name="Virtual HelpDesk Agent",
-    instructions="Route general in-hospital desktop login or certificate issues, Zoom support available.",
-    model="gpt-4o"
+    instructions="Handle in-hospital desktop/login or certificate issues; Zoom support available.",
+    model="gpt-4o",
 )
-
 wcinyp_agent = Agent(
     name="WCINYP IT Agent",
-    instructions="Route remote/home access issues: VPN, Outlook, EPIC, or other systems not at hospital.",
-    model="gpt-4o"
+    instructions="Handle remote/home issues: VPN, Outlook, EPIC, email sync.",
+    model="gpt-4o",
 )
-
 radiqal_agent = Agent(
     name="Radiqal Agent",
-    instructions="Route QA/discrepancy reports (image labels, mismatches) needing Radiqal tool via PACS.",
-    model="gpt-4o"
+    instructions="Handle QA/discrepancy tickets via Radiqal within PACS.",
+    model="gpt-4o",
 )
 
 SUPPORT_DIRECTORY = {
@@ -94,49 +93,48 @@ SUPPORT_DIRECTORY = {
         "email": "servicedesk@nyp.org (Subject: RADSUPPORTEASTCRITICAL)",
         "other": "N/A",
         "note": "Clinical PACS workstation support",
-        "hours": "24/7"
+        "hours": "24/7",
     },
     "Virtual HelpDesk": {
         "phone": "(212) 746-4878",
         "email": "N/A",
         "other": "Zoom: https://nyph.zoom.us/j/9956909465",
         "note": "Support via Zoom sessions",
-        "hours": "Mon–Fri, 9 AM–5 PM"
+        "hours": "Mon–Fri, 9 AM–5 PM",
     },
     "WCINYP IT": {
         "phone": "(212) 746-4878",
         "email": "wcinypit@med.cornell.edu",
         "other": "Contact via myHelpdesk portal 24/7",
         "note": "Home VPN / EPIC / Outlook issues",
-        "hours": "7 AM–7 PM"
+        "hours": "7 AM–7 PM",
     },
     "Radiqal": {
         "phone": "N/A",
-        "email": "N/A - use Radiqal within Medicalis/VuePACS",
+        "email": "N/A - use Radiqal in Medicalis/VuePACS",
         "other": "Use Radiqal Tip Sheet guidance",
         "note": "QA system support",
-        "hours": "Platform dependent"
+        "hours": "Platform dependent",
     },
 }
 
 triage_agent = Agent(
     name="Support Triage Agent",
     instructions="""
-Based on the user's description and context (e.g., radiologist subspecialty, time, location),
-choose exactly one of these departments and respond *only* with a JSON object:
+Based on the user's description and context (subspecialty, time, location),
+choose one department. Reply ONLY with valid JSON matching:
 
-- "Hospital Reading Rooms": PACS/image viewer freezing or crashes during CT/MRI interpretation.
-- "Virtual HelpDesk": In-hospital desktop login, certificate, or workstation issues (not PACS).
-- "WCINYP IT": Remote/home issues — VPN, Outlook, EPIC, email sync.
-- "Radiqal": QA/discrepancy reports via Radiqal in Medicalis/VuePACS.
-
-Example valid response (no extra text):
-
-{"department": "WCINYP IT"}
+{"department": "<one of: Hospital Reading Rooms, Virtual HelpDesk, WCINYP IT, Radiqal>"}
 """,
+    output_type=DepartmentLabel,
+    handoffs=[
+        hospital_rr_agent,
+        virtual_helpdesk_agent,
+        wcinyp_agent,
+        radiqal_agent,
+    ],
     model="gpt-4o",
-    handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
-    input_guardrails=[radiology_scope_guardrail]
+    input_guardrails=[radiology_scope_guardrail],
 )
 
 def run_async_task(task):
@@ -151,79 +149,66 @@ def parse_hours_string(hours_string):
     if hours_string.strip() == "24/7":
         return ("00:00", "23:59")
     if "–" in hours_string:
-        a, b = hours_string.split("–")
+        start, end = hours_string.split("–")
         try:
-            start = datetime.strptime(a.strip().replace(" ", ""), "%I%p").strftime("%H:%M")
-            end   = datetime.strptime(b.strip().replace(" ", ""), "%I%p").strftime("%H:%M")
-            return (start, end)
+            s = datetime.strptime(start.strip(), "%I%p").strftime("%H:%M")
+            e = datetime.strptime(end.strip(), "%I%p").strftime("%H:%M")
+            return (s, e)
         except:
             return None
     return None
 
 def load_backend_json(path="fake_backend_data.json", index=BACKEND_EXAMPLE_INDEX):
     with open(path, "r") as f:
-        examples = json.load(f)
-    return examples[index]
+        arr = json.load(f)
+    return arr[index]
 
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     backend = load_backend_json()
-    name       = backend["user"]["name"]
-    time_str   = backend["timestamp"]["time"]
-    date_str   = backend["timestamp"]["date"]
-    day_of_week= backend["timestamp"]["day_of_week"]
-    weekend_or = backend["timestamp"]["is_weekend_or_holiday"].lower() == "yes"
+    user_meta = backend["user"]
+    ts_meta   = backend["timestamp"]
 
-    # 1) run triage -> raw text
-    run_result = run_async_task(Runner.run(triage_agent, user_input))
-    raw        = run_result.final_output
-    st.write("🧪 DEBUG: raw triage response:", raw)
+    name       = user_meta["name"]
+    time_str   = ts_meta["time"].split()[0]
+    date_str   = ts_meta["date"]
+    dow        = ts_meta["day_of_week"]
+    weekend_or = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    # 2) parse JSON
-    try:
-        obj = json.loads(raw)
-    except Exception as e:
-        st.error("❌ Could not parse triage response as JSON.")
-        st.write("🔎 raw response:", raw)
-        raise
-
-    dept = obj.get("department")
-    if dept not in SUPPORT_DIRECTORY:
-        st.error(f"❌ Invalid department returned: {dept!r}")
-        st.write("🔎 full parsed object:", obj)
-        raise ValueError(f"Unknown department: {dept}")
+    # run the triage agent
+    run_res = run_async_task(Runner.run(triage_agent, user_input))
+    dept = run_res.final_output.department
+    if not dept or dept not in SUPPORT_DIRECTORY:
+        raise ValueError(f"Triage failed, invalid department: {dept!r}")
 
     contact = SUPPORT_DIRECTORY[dept]
 
-    # 3) check availability
-    support_available = True
+    # availability check
+    support_ok = True
     fallback = None
     if contact["hours"].strip() != "24/7":
-        hrange = parse_hours_string(contact["hours"])
-        now    = datetime.strptime(time_str.split()[0], "%H:%M:%S")
-        start  = datetime.strptime(hrange[0], "%H:%M")
-        end    = datetime.strptime(hrange[1], "%H:%M")
-        us_h = holidays.US()
-        is_hol = date_str in us_h
+        rng = parse_hours_string(contact["hours"])
+        now = datetime.strptime(time_str, "%H:%M:%S")
+        start = datetime.strptime(rng[0], "%H:%M")
+        end   = datetime.strptime(rng[1], "%H:%M")
+        us_h  = holidays.US()
+        is_hol= date_str in us_h
 
-        if not (start <= now <= end) or day_of_week in ["Sat","Sun"] or weekend_or or is_hol:
-            support_available = False
-            for alt, d2 in SUPPORT_DIRECTORY.items():
-                if alt==dept or d2["hours"].strip()=="24/7":
+        if not (start <= now <= end) or dow in ("Sat","Sun") or weekend_or or is_hol:
+            support_ok = False
+            for alt, info in SUPPORT_DIRECTORY.items():
+                if alt == dept or info["hours"].strip() == "24/7":
                     continue
-                hr2 = parse_hours_string(d2["hours"])
-                s2 = datetime.strptime(hr2[0], "%H:%M")
-                e2 = datetime.strptime(hr2[1], "%H:%M")
+                rng2 = parse_hours_string(info["hours"])
+                s2 = datetime.strptime(rng2[0], "%H:%M")
+                e2 = datetime.strptime(rng2[1], "%H:%M")
                 if s2 <= now <= e2:
                     fallback = alt
                     break
 
-    # 4) email draft
-    draft_prompt = (
-        user_input
-        + f" Please sign the email as {name}."
-    )
-    draft_run = run_async_task(Runner.run(email_draft_agent, draft_prompt))
-    draft_text= draft_run.final_output
+    # email draft
+    prompt = f"{user_input} Please sign the email as {name}."
+    draft_res = run_async_task(Runner.run(email_draft_agent, prompt))
+    draft = draft_res.final_output
 
     return SupportResponse(
         department=dept,
@@ -232,7 +217,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         other=contact["other"],
         note=contact["note"],
         hours=contact["hours"],
-        email_draft=draft_text,
-        support_available=support_available,
-        fallback_department=fallback
+        email_draft=draft,
+        support_available=support_ok,
+        fallback_department=fallback,
     )
