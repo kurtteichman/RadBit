@@ -214,7 +214,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    # generate and extract the draft text
     draft_run = run_async_task(
         Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}.")
     )
