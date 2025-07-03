@@ -47,7 +47,7 @@ Avoid bullet lists or formal report style.
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
     instructions="""
-Detect if the user's message is off-topic (philosophical, existential, etc.).
+Determine if the user's message is off-topic (philosophical, existential, etc.).
 Only allow through clear radiology/IT support requests.
 """,
     output_type=OutOfScopeCheck,
@@ -111,7 +111,7 @@ SUPPORT_DIRECTORY = {
     },
     "Radiqal": {
         "phone": "N/A",
-        "email": "N/A - use Radiqal in Medicalis/VuePACS",
+        "email": "N/A - use Radiqal within Medicalis/VuePACS",
         "other": "Use Radiqal Tip Sheet guidance",
         "note": "QA system support",
         "hours": "Platform dependent",
@@ -145,15 +145,23 @@ def run_async_task(task):
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(task)
 
-def parse_hours_string(hours_string):
-    if hours_string.strip() == "24/7":
+def parse_hours_string(hours_string: str):
+    s = hours_string.strip()
+    if s == "24/7":
         return ("00:00", "23:59")
-    if "–" in hours_string:
-        start, end = hours_string.split("–")
+    # if there's a comma, assume format "Mon–Fri, 9 AM–5 PM"
+    if "," in s:
+        _, time_part = s.split(",", 1)
+        s = time_part.strip()
+    # split on the first dash only
+    if "–" in s:
+        start_raw, end_raw = s.split("–", 1)
+        # remove normal & non-breaking spaces
+        clean = lambda t: t.replace(" ", "").replace(" ", "")
         try:
-            s = datetime.strptime(start.strip(), "%I%p").strftime("%H:%M")
-            e = datetime.strptime(end.strip(), "%I%p").strftime("%H:%M")
-            return (s, e)
+            start = datetime.strptime(clean(start_raw), "%I%p").strftime("%H:%M")
+            end   = datetime.strptime(clean(end_raw),   "%I%p").strftime("%H:%M")
+            return (start, end)
         except:
             return None
     return None
@@ -174,7 +182,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     dow        = ts_meta["day_of_week"]
     weekend_or = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    # run the triage agent
     run_res = run_async_task(Runner.run(triage_agent, user_input))
     dept = run_res.final_output.department
     if not dept or dept not in SUPPORT_DIRECTORY:
@@ -182,30 +189,30 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     contact = SUPPORT_DIRECTORY[dept]
 
-    # availability check
     support_ok = True
     fallback = None
     if contact["hours"].strip() != "24/7":
         rng = parse_hours_string(contact["hours"])
-        now = datetime.strptime(time_str, "%H:%M:%S")
-        start = datetime.strptime(rng[0], "%H:%M")
-        end   = datetime.strptime(rng[1], "%H:%M")
-        us_h  = holidays.US()
-        is_hol= date_str in us_h
+        if rng:
+            now   = datetime.strptime(time_str, "%H:%M:%S")
+            start = datetime.strptime(rng[0], "%H:%M")
+            end   = datetime.strptime(rng[1], "%H:%M")
+            us_h  = holidays.US()
+            is_hol= date_str in us_h
 
-        if not (start <= now <= end) or dow in ("Sat","Sun") or weekend_or or is_hol:
-            support_ok = False
-            for alt, info in SUPPORT_DIRECTORY.items():
-                if alt == dept or info["hours"].strip() == "24/7":
-                    continue
-                rng2 = parse_hours_string(info["hours"])
-                s2 = datetime.strptime(rng2[0], "%H:%M")
-                e2 = datetime.strptime(rng2[1], "%H:%M")
-                if s2 <= now <= e2:
-                    fallback = alt
-                    break
+            if not (start <= now <= end) or dow in ("Sat","Sun") or weekend_or or is_hol:
+                support_ok = False
+                for alt, info in SUPPORT_DIRECTORY.items():
+                    if alt == dept or info["hours"].strip() == "24/7":
+                        continue
+                    rng2 = parse_hours_string(info["hours"])
+                    if rng2:
+                        s2 = datetime.strptime(rng2[0], "%H:%M")
+                        e2 = datetime.strptime(rng2[1], "%H:%M")
+                        if s2 <= now <= e2:
+                            fallback = alt
+                            break
 
-    # email draft
     prompt = f"{user_input} Please sign the email as {name}."
     draft_res = run_async_task(Runner.run(email_draft_agent, prompt))
     draft = draft_res.final_output
