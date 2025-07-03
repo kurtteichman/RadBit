@@ -179,11 +179,11 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     dow        = ts_meta["day_of_week"]
     weekend_or = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
+    # run the triage agent
     run_res = run_async_task(Runner.run(triage_agent, user_input))
     dept = run_res.final_output.department
     if not dept or dept not in SUPPORT_DIRECTORY:
         raise ValueError(f"Triage failed, invalid department: {dept!r}")
-
     contact = SUPPORT_DIRECTORY[dept]
 
     # availability check
@@ -209,11 +209,17 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    # generate draft
+    # generate draft and coerce to string
     draft_run = run_async_task(
         Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}.")
     )
-    draft_text = draft_run.final_output.response
+    raw = draft_run.final_output
+    if isinstance(raw, str):
+        draft_text = raw
+    elif hasattr(raw, "response"):
+        draft_text = raw.response
+    else:
+        draft_text = str(raw)
 
     return SupportResponse(
         department=dept,
