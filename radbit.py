@@ -32,6 +32,9 @@ class OutOfScopeCheck(BaseModel):
     is_off_topic: bool
     explanation: str
 
+class EmailDraft(BaseModel):
+    response: str
+
 email_draft_agent = Agent(
     name="Email Draft Generator",
     instructions="""
@@ -41,6 +44,7 @@ Include what happened, any steps taken, and a request for help.
 Close with 'Thank you' and sign as '{user_name}'.
 Avoid bullet lists or formal report style.
 """,
+    output_type=EmailDraft,
     model="gpt-4o"
 )
 
@@ -124,7 +128,7 @@ triage_agent = Agent(
 Based on the user's description and context (subspecialty, time, location),
 choose one department. Reply ONLY with valid JSON matching:
 
-{"department": "<one of: Hospital Reading Rooms, Virtual HelpDesk, WCINYP IT, Radiqal>"}
+{"department": "<Hospital Reading Rooms|Virtual HelpDesk|WCINYP IT|Radiqal>"}
 """,
     output_type=DepartmentLabel,
     handoffs=[
@@ -186,21 +190,21 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     contact = SUPPORT_DIRECTORY[dept]
 
+    now = datetime.strptime(time_str, "%H:%M:%S")
     support_ok = True
     fallback = None
-    if contact["hours"].strip() != "24/7":
+
+    if contact["hours"] != "24/7":
         rng = parse_hours_string(contact["hours"])
         if rng:
-            now   = datetime.strptime(time_str, "%H:%M:%S")
             start = datetime.strptime(rng[0], "%H:%M")
             end   = datetime.strptime(rng[1], "%H:%M")
-            us_h  = holidays.US()
-            is_hol= date_str in us_h
+            is_hol= date_str in holidays.US()
 
             if not (start <= now <= end) or dow in ("Sat","Sun") or weekend_or or is_hol:
                 support_ok = False
                 for alt, info in SUPPORT_DIRECTORY.items():
-                    if alt == dept or info["hours"].strip() == "24/7":
+                    if alt == dept or info["hours"] == "24/7":
                         continue
                     rng2 = parse_hours_string(info["hours"])
                     if rng2:
@@ -210,17 +214,11 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    # generate and coerce the draft into a string
-    draft_run = run_async_task(Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}."))
-    raw = draft_run.final_output
-    if isinstance(raw, str):
-        draft = raw
-    elif hasattr(raw, "response"):
-        draft = raw.response
-    elif hasattr(raw, "message"):
-        draft = raw.message
-    else:
-        draft = str(raw)
+    # generate and extract the draft text
+    draft_run = run_async_task(
+        Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}.")
+    )
+    draft_text = draft_run.final_output.response
 
     return SupportResponse(
         department=dept,
@@ -229,7 +227,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         other=contact["other"],
         note=contact["note"],
         hours=contact["hours"],
-        email_draft=draft,
+        email_draft=draft_text,
         support_available=support_ok,
         fallback_department=fallback,
     )
