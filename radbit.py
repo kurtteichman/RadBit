@@ -11,8 +11,11 @@ from agents import (
     TResponseInputItem,
 )
 import holidays
+import openai
 
-BACKEND_EXAMPLE_INDEX = 2  # set to 0, 1, or 2 to pick the JSON entry
+# If you’ve called set_default_openai_key(...) in your UI, openai.api_key is already set.
+
+BACKEND_EXAMPLE_INDEX = 2  # Change to 0,1,2 to pick among your three fake-backend entries
 
 class SupportResponse(BaseModel):
     department: str
@@ -32,26 +35,35 @@ class OutOfScopeCheck(BaseModel):
     is_off_topic: bool
     explanation: str
 
-email_draft_agent = Agent(
-    name="Email Draft Generator",
-    instructions="""
-Write a conversational, polite email summarizing the user's issue.
-Use a human tone, opening with 'To whom it may concern' if no name is known.
-Include what happened, any steps taken, and a request for help.
-Close with 'Thank you' and sign as '{user_name}'.
-Do not wrap in JSON; just return the raw email body text.
-""",
-    model="gpt-4o"
-)
+def generate_email_draft(issue: str, user_name: str) -> str:
+    system = {
+        "role": "system",
+        "content": f"""
+You are a professional assistant that writes polite, conversational support request emails.
+Open with "To whom it may concern," if no recipient name is known.
+Summarize the issue described by the user below.
+Close with "Thank you" and sign as "{user_name}".
+Avoid bullet lists or formal report formatting; write in natural prose.
+""".strip()
+    }
+    user = {"role": "user", "content": issue}
+    resp = openai.ChatCompletion.create(
+        model="gpt-4o",
+        messages=[system, user],
+        temperature=0.5,
+    )
+    return resp.choices[0].message.content.strip()
+
+email_draft_agent = None  # no longer used
 
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
     instructions="""
 Determine if the user's message is off-topic (philosophical, existential, etc.).
-Only allow through clear radiology/IT support requests.
+Only allow clear radiology/IT support requests through.
 """,
     output_type=OutOfScopeCheck,
-    model="gpt-4o"
+    model="gpt-4o",
 )
 
 @input_guardrail
@@ -122,9 +134,8 @@ triage_agent = Agent(
     name="Support Triage Agent",
     instructions="""
 Based on the user's description and context (subspecialty, time, location),
-choose one department. Reply ONLY with valid JSON matching:
-
-{"department": "<Hospital Reading Rooms|Virtual HelpDesk|WCINYP IT|Radiqal>"}
+choose exactly one department. Respond **only** with JSON like:
+{"department": "Hospital Reading Rooms"}
 """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
@@ -148,12 +159,13 @@ def parse_hours_string(hours_string: str):
         _, time_part = s.split(",", 1)
         s = time_part.strip()
     if "–" in s:
-        start_raw, end_raw = s.split("–", 1)
-        clean = lambda t: t.replace(" ", "").replace("\u202F", "")
+        a, b = s.split("–", 1)
+        clean = lambda t: t.replace(" ", "").replace(" ", "")
         try:
-            start = datetime.strptime(clean(start_raw), "%I%p").strftime("%H:%M")
-            end   = datetime.strptime(clean(end_raw),   "%I%p").strftime("%H:%M")
-            return (start, end)
+            return (
+                datetime.strptime(clean(a), "%I%p").strftime("%H:%M"),
+                datetime.strptime(clean(b), "%I%p").strftime("%H:%M"),
+            )
         except:
             return None
     return None
@@ -174,52 +186,48 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     dow        = ts_meta["day_of_week"]
     weekend_or = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    # run the triage agent
-    run_res = run_async_task(Runner.run(triage_agent, user_input))
-    dept = run_res.final_output.department
-    if not dept or dept not in SUPPORT_DIRECTORY:
-        raise ValueError(f"Triage failed, invalid department: {dept!r}")
-    contact = SUPPORT_DIRECTORY[dept]
+    # 1) triage
+    tri = run_async_task(Runner.run(triage_agent, user_input))
+    dept = tri.final_output.department
+    if dept not in SUPPORT_DIRECTORY:
+        raise ValueError(f"Triage failed: got {dept!r}")
 
-    # availability check
+    info = SUPPORT_DIRECTORY[dept]
+
+    # 2) availability
     now = datetime.strptime(time_str, "%H:%M:%S")
     support_ok = True
     fallback = None
-    if contact["hours"] != "24/7":
-        rng = parse_hours_string(contact["hours"])
+    if info["hours"] != "24/7":
+        rng = parse_hours_string(info["hours"])
         if rng:
             start = datetime.strptime(rng[0], "%H:%M")
             end   = datetime.strptime(rng[1], "%H:%M")
-            is_hol= date_str in holidays.US()
+            is_hol = date_str in holidays.US()
             if not (start <= now <= end) or dow in ("Sat","Sun") or weekend_or or is_hol:
                 support_ok = False
-                for alt, info in SUPPORT_DIRECTORY.items():
-                    if alt == dept or info["hours"] == "24/7":
+                for alt, alt_info in SUPPORT_DIRECTORY.items():
+                    if alt == dept or alt_info["hours"] == "24/7":
                         continue
-                    rng2 = parse_hours_string(info["hours"])
-                    if rng2:
-                        s2 = datetime.strptime(rng2[0], "%H:%M")
-                        e2 = datetime.strptime(rng2[1], "%H:%M")
+                    r2 = parse_hours_string(alt_info["hours"])
+                    if r2:
+                        s2 = datetime.strptime(r2[0], "%H:%M")
+                        e2 = datetime.strptime(r2[1], "%H:%M")
                         if s2 <= now <= e2:
                             fallback = alt
                             break
 
-    # generate draft, guaranteed to come back as a plain string
-    draft_run = run_async_task(
-        Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}.")
-    )
-    raw = draft_run.final_output
-    # coerce to str
-    draft_text = raw if isinstance(raw, str) else str(raw)
+    # 3) email draft via direct API call
+    draft = generate_email_draft(user_input, name)
 
     return SupportResponse(
         department=dept,
-        phone=contact["phone"],
-        email=contact["email"],
-        other=contact["other"],
-        note=contact["note"],
-        hours=contact["hours"],
-        email_draft=draft_text,
+        phone=info["phone"],
+        email=info["email"],
+        other=info["other"],
+        note=info["note"],
+        hours=info["hours"],
+        email_draft=draft,
         support_available=support_ok,
         fallback_department=fallback,
     )
