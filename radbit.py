@@ -32,6 +32,9 @@ class OutOfScopeCheck(BaseModel):
     is_off_topic: bool
     explanation: str
 
+class EmailDraft(BaseModel):
+    response: str
+
 email_draft_agent = Agent(
     name="Email Draft Generator",
     instructions="""
@@ -39,8 +42,10 @@ Write a conversational, polite email summarizing the user's issue.
 Use a human tone, opening with 'To whom it may concern' if no name is known.
 Include what happened, any steps taken, and a request for help.
 Close with 'Thank you' and sign as '{user_name}'.
-Avoid bullet lists or formal report style.
+Return ONLY valid JSON in this exact format:
+{"response": "<the full email body>"}
 """,
+    output_type=EmailDraft,
     model="gpt-4o"
 )
 
@@ -181,7 +186,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     contact = SUPPORT_DIRECTORY[dept]
 
-    # check availability
+    # availability check
     now = datetime.strptime(time_str, "%H:%M:%S")
     support_ok = True
     fallback = None
@@ -208,15 +213,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     draft_run = run_async_task(
         Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}.")
     )
-    raw = draft_run.final_output
-    if isinstance(raw, str):
-        draft_text = raw
-    elif hasattr(raw, "response"):
-        draft_text = raw.response
-    elif hasattr(raw, "message"):
-        draft_text = raw.message
-    else:
-        draft_text = str(raw)
+    draft_text = draft_run.final_output.response
 
     return SupportResponse(
         department=dept,
