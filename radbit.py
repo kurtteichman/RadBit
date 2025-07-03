@@ -149,15 +149,12 @@ def parse_hours_string(hours_string: str):
     s = hours_string.strip()
     if s == "24/7":
         return ("00:00", "23:59")
-    # if there's a comma, assume format "Mon–Fri, 9 AM–5 PM"
     if "," in s:
         _, time_part = s.split(",", 1)
         s = time_part.strip()
-    # split on the first dash only
     if "–" in s:
         start_raw, end_raw = s.split("–", 1)
-        # remove normal & non-breaking spaces
-        clean = lambda t: t.replace(" ", "").replace(" ", "")
+        clean = lambda t: t.replace(" ", "").replace("\u202F", "")
         try:
             start = datetime.strptime(clean(start_raw), "%I%p").strftime("%H:%M")
             end   = datetime.strptime(clean(end_raw),   "%I%p").strftime("%H:%M")
@@ -213,9 +210,17 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    prompt = f"{user_input} Please sign the email as {name}."
-    draft_res = run_async_task(Runner.run(email_draft_agent, prompt))
-    draft = draft_res.final_output
+    # generate and coerce the draft into a string
+    draft_run = run_async_task(Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}."))
+    raw = draft_run.final_output
+    if isinstance(raw, str):
+        draft = raw
+    elif hasattr(raw, "response"):
+        draft = raw.response
+    elif hasattr(raw, "message"):
+        draft = raw.message
+    else:
+        draft = str(raw)
 
     return SupportResponse(
         department=dept,
