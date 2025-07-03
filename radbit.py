@@ -2,18 +2,18 @@ import asyncio
 import json
 from datetime import datetime
 from pydantic import BaseModel
-import streamlit as st  # For debugging output in Streamlit UI
 from agents import (
     Agent,
     Runner,
     input_guardrail,
     GuardrailFunctionOutput,
     RunContextWrapper,
-    TResponseInputItem,
+    TResponseInputItem
 )
 import holidays
+import streamlit as st
 
-BACKEND_EXAMPLE_INDEX = 2  # Change this index to test different backend cases
+BACKEND_EXAMPLE_INDEX = 2  # Change this index to switch between backend examples
 
 class SupportResponse(BaseModel):
     department: str
@@ -176,19 +176,22 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     is_weekend_or_holiday = backend["timestamp"]["is_weekend_or_holiday"].lower() == "yes"
 
     triage_result = run_async_task(Runner.run(triage_agent, user_input))
+    st.write("🧪 DEBUG — Triage agent result:", triage_result)
 
-    # Streamlit debugging output
-    st.write("📤 Triage result:", triage_result)
-
-    if not triage_result.final_output or not hasattr(triage_result.final_output, "department"):
-        st.error("❌ Error: triage agent returned None or missing department.")
-        st.write("Full triage object:", triage_result)
-        raise ValueError("Support triage failed — no department returned.")
+    # Defensive handling of None responses
+    if (
+        not triage_result.final_output
+        or not hasattr(triage_result.final_output, "department")
+        or triage_result.final_output.department is None
+    ):
+        st.error("❌ triage_agent did not return a valid department.")
+        st.write("⚠️ triage_result.final_output:", triage_result.final_output)
+        st.write("🔎 full result object:", triage_result)
+        raise ValueError("triage_agent did not return a valid department.")
 
     dept = triage_result.final_output.department
     contact = SUPPORT_DIRECTORY.get(dept)
     if contact is None:
-        st.error(f"❌ Error: Department '{dept}' not found in SUPPORT_DIRECTORY.")
         raise ValueError(f"No contact info found for department: {dept}")
 
     support_available = True
