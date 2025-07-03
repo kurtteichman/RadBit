@@ -32,9 +32,6 @@ class OutOfScopeCheck(BaseModel):
     is_off_topic: bool
     explanation: str
 
-class EmailDraft(BaseModel):
-    response: str
-
 email_draft_agent = Agent(
     name="Email Draft Generator",
     instructions="""
@@ -44,7 +41,6 @@ Include what happened, any steps taken, and a request for help.
 Close with 'Thank you' and sign as '{user_name}'.
 Avoid bullet lists or formal report style.
 """,
-    output_type=EmailDraft,
     model="gpt-4o"
 )
 
@@ -131,12 +127,7 @@ choose one department. Reply ONLY with valid JSON matching:
 {"department": "<Hospital Reading Rooms|Virtual HelpDesk|WCINYP IT|Radiqal>"}
 """,
     output_type=DepartmentLabel,
-    handoffs=[
-        hospital_rr_agent,
-        virtual_helpdesk_agent,
-        wcinyp_agent,
-        radiqal_agent,
-    ],
+    handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
     model="gpt-4o",
     input_guardrails=[radiology_scope_guardrail],
 )
@@ -190,17 +181,16 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     contact = SUPPORT_DIRECTORY[dept]
 
+    # check availability
     now = datetime.strptime(time_str, "%H:%M:%S")
     support_ok = True
     fallback = None
-
     if contact["hours"] != "24/7":
         rng = parse_hours_string(contact["hours"])
         if rng:
             start = datetime.strptime(rng[0], "%H:%M")
             end   = datetime.strptime(rng[1], "%H:%M")
             is_hol= date_str in holidays.US()
-
             if not (start <= now <= end) or dow in ("Sat","Sun") or weekend_or or is_hol:
                 support_ok = False
                 for alt, info in SUPPORT_DIRECTORY.items():
@@ -214,10 +204,19 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
+    # generate draft
     draft_run = run_async_task(
         Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}.")
     )
-    draft_text = draft_run.final_output.response
+    raw = draft_run.final_output
+    if isinstance(raw, str):
+        draft_text = raw
+    elif hasattr(raw, "response"):
+        draft_text = raw.response
+    elif hasattr(raw, "message"):
+        draft_text = raw.message
+    else:
+        draft_text = str(raw)
 
     return SupportResponse(
         department=dept,
