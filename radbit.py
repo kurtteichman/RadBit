@@ -3,19 +3,11 @@ import json
 from datetime import datetime
 from pydantic import BaseModel
 from openai import OpenAI
-from agents import (
-    Agent,
-    Runner,
-    input_guardrail,
-    GuardrailFunctionOutput,
-    RunContextWrapper,
-    TResponseInputItem,
-)
+from agents import Agent, Runner, input_guardrail, GuardrailFunctionOutput, RunContextWrapper, TResponseInputItem
 import holidays
 
-BACKEND_EXAMPLE_INDEX = 2  # change to 0,1,2 to pick a different example
+BACKEND_EXAMPLE_INDEX = 2
 
-# initialize the new OpenAI client (reads OPENAI_API_KEY from env)
 client = OpenAI()
 
 class SupportResponse(BaseModel):
@@ -40,13 +32,11 @@ def generate_email_draft(issue: str, user_name: str) -> str:
     messages = [
         {
             "role": "system",
-            "content": f"""
-You are a professional assistant that writes polite, conversational support request emails.
+            "content": f"""You are a professional assistant that writes polite, conversational support request emails.
 Open with "To whom it may concern," if no recipient name is known.
 Summarize the issue described by the user below.
 Close with "Thank you" and sign as "{user_name}".
-Avoid bullet lists or formal report formatting; write in natural prose.
-""".strip()
+Avoid bullet lists or formal report formatting; write in natural prose."""
         },
         {"role": "user", "content": issue},
     ]
@@ -56,8 +46,6 @@ Avoid bullet lists or formal report formatting; write in natural prose.
         temperature=0.5,
     )
     return resp.choices[0].message.content.strip()
-
-# ---- guardrail and triage agents unchanged ----
 
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
@@ -107,7 +95,6 @@ triage_agent = Agent(
     instructions="""
 Based on the user's description and context (subspecialty, time, location),
 choose exactly one department. Reply ONLY with valid JSON matching:
-
 {"department": "Hospital Reading Rooms" | "Virtual HelpDesk" | "WCINYP IT" | "Radiqal"}
 """,
     output_type=DepartmentLabel,
@@ -190,7 +177,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     dow = ts_meta["day_of_week"]
     weekend = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    # 1) run triage
     tri = run_async_task(Runner.run(triage_agent, user_input))
     dept = tri.final_output.department
     if dept not in SUPPORT_DIRECTORY:
@@ -198,7 +184,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     info = SUPPORT_DIRECTORY[dept]
 
-    # 2) check availability + fallback
     now = datetime.strptime(t_str, "%H:%M:%S")
     ok = True
     fallback = None
@@ -221,7 +206,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    # 3) generate a pure-string email draft
     draft = generate_email_draft(user_input, name)
 
     return SupportResponse(
@@ -235,3 +219,37 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         support_available=ok,
         fallback_department=fallback,
     )
+
+def generate_faqs(history: list[dict]) -> list[dict]:
+    if not history:
+        return []
+    items = [
+        {"input": e["input"], "contact_info": e["contact_info"]}
+        for e in history
+    ]
+    messages = [
+        {
+            "role": "system",
+            "content": """
+You are an assistant that, given a list of past support requests and their resolved contact info,
+produce a JSON list of FAQs. Group similar requests into a single question, and for each question
+provide an answer that includes the contact department, phone, email, and any other relevant info.
+Respond ONLY with valid JSON in this format:
+[
+  {"question": "...", "answer": "..."},
+  ...
+]
+""".strip()
+        },
+        {"role": "user", "content": json.dumps(items)}
+    ]
+    resp = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        temperature=0.7,
+    )
+    text = resp.choices[0].message.content.strip()
+    try:
+        return json.loads(text)
+    except:
+        return []
