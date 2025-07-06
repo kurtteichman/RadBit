@@ -33,7 +33,7 @@ left, right = st.columns([1.25, 1.75], gap="large")
 
 with left:
     st.subheader("Describe Your Issue")
-    current_input = st.text_area("", value=st.session_state.user_input, height=200, label_visibility="collapsed")
+    current_input = st.text_area("Your issue", value=st.session_state.user_input, height=200)
     submit = st.button("Submit Request", use_container_width=True)
 
     if current_input.strip() != st.session_state.user_input.strip():
@@ -75,18 +75,18 @@ with left:
             st.error(f"An unexpected error occurred: {e}")
 
     if st.session_state.triage_result:
-        result = st.session_state.triage_result
+        r = st.session_state.triage_result
         st.markdown("### Recommended Support Contact")
-        st.markdown(f"**Department:** {result.department}")
-        st.markdown(f"**Phone:** {result.phone}")
-        st.markdown(f"**Email:** {result.email}")
-        st.markdown(f"**Other Info:** {result.other}")
-        st.markdown(f"**Note:** {result.note}")
-        st.markdown(f"**Availability:** {result.hours}")
-        if not result.support_available:
+        st.markdown(f"**Department:** {r.department}")
+        st.markdown(f"**Phone:** {r.phone}")
+        st.markdown(f"**Email:** {r.email}")
+        st.markdown(f"**Other Info:** {r.other}")
+        st.markdown(f"**Note:** {r.note}")
+        st.markdown(f"**Availability:** {r.hours}")
+        if not r.support_available:
             st.warning("This department is currently unavailable based on the time or holiday schedule.")
-            if result.fallback_department:
-                st.info(f"Recommended alternative: **{result.fallback_department}** (currently available)")
+            if r.fallback_department:
+                st.info(f"Recommended alternative: **{r.fallback_department}** (currently available)")
 
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
@@ -106,16 +106,21 @@ with st.expander("Request History", expanded=False):
         st.markdown(f"- Input: {entry['input']}")
         st.markdown(f"- Department: {entry['department']}")
         with st.expander("View Recommended Support Contact"):
-            info = entry['contact_info']
+            info = entry["contact_info"]
             for k, v in info.items():
                 if v and v != "N/A":
                     st.markdown(f"**{k}:** {v}")
 
-with st.expander("24-Hour FAQ Digest", expanded=False):
-    if st.session_state.history:
-        faqs = generate_faqs(st.session_state.history)
-        for faq in faqs:
-            st.markdown(f"**Q:** {faq.question}")
-            st.markdown(f"**A:** {faq.answer}")
+st.divider()
+
+faqs = generate_faqs(st.session_state.history)
+with st.expander("24-Hour Digest & FAQs", expanded=False):
+    if not st.session_state.history:
+        st.markdown("No requests have been submitted yet for the digest.")
+    elif not faqs:
+        st.markdown("Requests found, but no FAQs could be generated.")
     else:
-        st.write("No requests yet to generate FAQs.")
+        for faq in faqs:
+            st.markdown(f"**Q: {faq['question']}**")
+            st.markdown(f"A: {faq['answer']}")
+            st.markdown("---")
