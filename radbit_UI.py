@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
-from radbit import triage_and_get_support_info
+from radbit import triage_and_get_support_info, generate_faqs
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
@@ -95,6 +95,7 @@ with right:
         st.button("Send Email", disabled=True)
 
 st.divider()
+
 with st.expander("Request History", expanded=False):
     if st.button("Clear History"):
         st.session_state.history = []
@@ -109,3 +110,12 @@ with st.expander("Request History", expanded=False):
             for k, v in info.items():
                 if v and v != "N/A":
                     st.markdown(f"**{k}:** {v}")
+
+with st.expander("24-Hour FAQ Digest", expanded=False):
+    if st.session_state.history:
+        faqs = generate_faqs(st.session_state.history)
+        for faq in faqs:
+            st.markdown(f"**Q:** {faq.question}")
+            st.markdown(f"**A:** {faq.answer}")
+    else:
+        st.write("No requests yet to generate FAQs.")
