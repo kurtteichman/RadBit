@@ -156,13 +156,13 @@ def load_backend_json(path="fake_backend_data.json", index=_BACKEND_EXAMPLE_INDE
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     backend = load_backend_json()
     user_meta = backend["user"]
-    ts_meta   = backend["timestamp"]
+    ts_meta = backend["timestamp"]
 
-    name     = user_meta["name"]
-    t_str    = ts_meta["time"].split()[0]
+    name = user_meta["name"]
+    t_str = ts_meta["time"].split()[0]
     date_str = ts_meta["date"]
-    dow      = ts_meta["day_of_week"]
-    weekend  = ts_meta["is_weekend_or_holiday"].lower() == "yes"
+    dow = ts_meta["day_of_week"]
+    weekend = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
     tri = run_async_task(Runner.run(triage_agent, user_input))
     dept = tri.final_output.department
@@ -177,9 +177,9 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         rng = parse_hours_string(info["hours"])
         if rng:
             start = datetime.strptime(rng[0], "%H:%M")
-            end   = datetime.strptime(rng[1], "%H:%M")
+            end = datetime.strptime(rng[1], "%H:%M")
             is_hol = date_str in holidays.US()
-            if not (start <= now <= end) or dow in ("Sat","Sun") or weekend or is_hol:
+            if not (start <= now <= end) or dow in ("Sat", "Sun") or weekend or is_hol:
                 support_ok = False
                 for alt, alt_info in SUPPORT_DIRECTORY.items():
                     if alt == dept or alt_info["hours"].strip() == "24/7":
@@ -229,16 +229,14 @@ def generate_faqs(history: list[dict]) -> list[dict]:
         return []
 
     inputs = [entry["input"] for entry in history][-20:]
-
     system_msg = {
         "role": "system",
         "content": (
-            "You are an expert assistant that reads user support request descriptions "
-            "and groups them by underlying technical theme (e.g., VPN failures, login loops, application crashes). "
-            "For each theme, produce a JSON object with:\n"
-            "- question: one clear, concise question summarizing that theme.\n"
+            "You are an expert assistant that reads user support request descriptions and groups them by underlying technical theme. "
+            "For each theme, return a JSON object with:\n"
+            "- question: a clear, concise question summarizing the theme\n"
             "- answer: two parts:\n"
-            "    1) brief steps the user can take to self-help,\n"
+            "    1) brief steps the user can take to self-help\n"
             "    2) appropriate support department(s) with phone and email.\n"
             "Return up to five such entries as a JSON array."
         ),
