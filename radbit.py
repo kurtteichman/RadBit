@@ -228,31 +228,33 @@ def generate_faqs(history: list[dict]) -> list[dict]:
     if not history:
         return []
 
-    try:
-        sample = history[-20:]
-        system_msg = {
-            "role": "system",
-            "content": (
-                "You are an assistant that transforms user support request history into high-quality FAQs, "
-                "grouped by underlying technical issue or theme."
-            ),
-        }
-        user_prompt = (
-            "For each theme, output a JSON object with:\n"
-            "- question: a single clear question summarizing that issue\n"
+    inputs = [entry["input"] for entry in history][-20:]
+
+    system_msg = {
+        "role": "system",
+        "content": (
+            "You are an expert assistant that reads user support request descriptions "
+            "and groups them by underlying technical theme (e.g., VPN failures, login loops, application crashes). "
+            "For each theme, produce a JSON object with:\n"
+            "- question: one clear, concise question summarizing that theme.\n"
             "- answer: two parts:\n"
-            "    1) brief self-help steps,\n"
-            "    2) contact info (department name, phone, email if available).\n"
-            "Return up to 5 such entries as a JSON array.\n\n"
-            f"Here are recent requests:\n{json.dumps(sample, indent=2)}"
-        )
-        llm_resp = _client.chat.completions.create(
+            "    1) brief steps the user can take to self-help,\n"
+            "    2) appropriate support department(s) with phone and email.\n"
+            "Return up to five such entries as a JSON array."
+        ),
+    }
+    user_msg = {
+        "role": "user",
+        "content": f"Here are recent support requests:\n{json.dumps(inputs, indent=2)}"
+    }
+
+    try:
+        llm = _client.chat.completions.create(
             model="gpt-4o",
-            messages=[system_msg, {"role": "user", "content": user_prompt}],
+            messages=[system_msg, user_msg],
             temperature=0.3,
         )
-        content = llm_resp.choices[0].message.content
-        faqs = json.loads(content)
+        faqs = json.loads(llm.choices[0].message.content)
         if isinstance(faqs, list) and all(isinstance(e, dict) and "question" in e and "answer" in e for e in faqs):
             return faqs
     except Exception:
