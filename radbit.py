@@ -6,13 +6,10 @@ from openai import OpenAI
 from agents import Agent, Runner, input_guardrail, GuardrailFunctionOutput, RunContextWrapper, TResponseInputItem
 import holidays
 
-# ——— Pick which fake backend entry to use ———
 BACKEND_EXAMPLE_INDEX = 2  # 0, 1, or 2
 
-# ——— Instantiate OpenAI client (reads API key from env or Streamlit secrets) ———
 _client = OpenAI()
 
-# ——— Data models ———
 class SupportResponse(BaseModel):
     department: str
     phone: str
@@ -88,7 +85,6 @@ choose exactly one department. Reply ONLY with JSON like:
     input_guardrails=[radiology_scope_guardrail],
 )
 
-# ——— Support directory ———
 SUPPORT_DIRECTORY = {
     "Hospital Reading Rooms": {
         "phone": "4-HELP (4-4357) or (212) 932-4357",
@@ -120,7 +116,6 @@ SUPPORT_DIRECTORY = {
     },
 }
 
-# ——— Helpers ———
 def run_async_task(task):
     try:
         loop = asyncio.get_event_loop()
@@ -133,7 +128,6 @@ def parse_hours_string(hours_string: str):
     s = hours_string.strip()
     if s == "24/7":
         return ("00:00", "23:59")
-    # drop any prefix like "Mon–Fri,"
     if "," in s:
         _, part = s.split(",", 1)
         s = part.strip()
@@ -154,27 +148,26 @@ def load_backend_json(path="fake_backend_data.json", index=BACKEND_EXAMPLE_INDEX
         arr = json.load(f)
     return arr[index]
 
-# ——— Core triage + email drafting ———
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     backend = load_backend_json()
     user_meta = backend["user"]
     ts_meta   = backend["timestamp"]
 
-    # extract metadata
+    # metadata
     name     = user_meta["name"]
     t_str    = ts_meta["time"].split()[0]
     date_str = ts_meta["date"]
     dow      = ts_meta["day_of_week"]
     weekend  = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    # 1) department triage
+    # 1) triage
     tri = run_async_task(Runner.run(triage_agent, user_input))
     dept = tri.final_output.department
     if dept not in SUPPORT_DIRECTORY:
-        raise ValueError(f"Triage failed, invalid department: {dept!r}")
+        raise ValueError(f"Triage failed, got {dept!r}")
     info = SUPPORT_DIRECTORY[dept]
 
-    # 2) availability & fallback
+    # 2) availability/fallback
     now = datetime.strptime(t_str, "%H:%M:%S")
     support_ok = True
     fallback = None
@@ -197,7 +190,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    # 3) email draft via OpenAI client (always returns a string)
+    # 3) email draft via OpenAI client
     msgs = [
         {"role": "system", "content": (
             "You are a professional assistant that writes polite, conversational support request emails.\n"
@@ -227,28 +220,50 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         fallback_department=fallback,
     )
 
-# ——— 24-Hour Digest & FAQ generation ———
 def generate_faqs(history: list[dict]) -> list[dict]:
-    if not history:
-        return []
-    sample = history[-20:]
-    prompt = (
-        "You are a radiology support assistant. Given this JSON array of recent support requests:\n\n"
-        f"{json.dumps(sample, indent=2)}\n\n"
-        "Generate up to five frequently asked questions summarizing the user issues, "
-        "and provide concise answers including department name and contact details. "
-        "Return valid JSON: a list of objects with 'question' and 'answer' keys."
-    )
-    try:
-        resp = _client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role":"system","content":"Generate FAQs from recent radiology support requests."},
-                {"role":"user","content":prompt}
-            ],
-            temperature=0.3,
+    # Try LLM-based FAQs first
+    if history:
+        sample = history[-20:]
+        user_prompt = (
+            "Given this JSON array of recent support requests:\n\n"
+            f"{json.dumps(sample, indent=2)}\n\n"
+            "Generate up to five FAQs with keys 'question' and 'answer', "
+            "where questions rephrase the user issues and answers "
+            "include department and contact info. Return valid JSON array."
         )
-        faqs = json.loads(resp.choices[0].message.content)
-        return [q for q in faqs if "question" in q and "answer" in q]
-    except Exception:
-        return []
+        try:
+            resp = _client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role":"system","content":"Generate FAQs from recent radiology support requests."},
+                    {"role":"user","content": user_prompt}
+                ],
+                temperature=0.3,
+            )
+            faqs = json.loads(resp.choices[0].message.content)
+            if isinstance(faqs, list) and all("question" in q and "answer" in q for q in faqs):
+                return faqs
+        except Exception:
+            pass
+
+    # Fallback: pick up to 5 most recent distinct inputs
+    fallback = []
+    seen = set()
+    for entry in reversed(history):
+        inp = entry["input"]
+        if inp in seen:
+            continue
+        seen.add(inp)
+        dept = entry["contact_info"]["Department"]
+        phone = entry["contact_info"]["Phone"]
+        email = entry["contact_info"].get("Email","")
+        ans = f"For \"{inp}\" contact {dept} at {phone}"
+        if email and email != "N/A":
+            ans += f", email {email}."
+        else:
+            ans += "."
+        fallback.append({"question": inp, "answer": ans})
+        if len(fallback) >= 5:
+            break
+
+    return fallback
