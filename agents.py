@@ -1,7 +1,6 @@
 import asyncio
 from typing import Any, Optional, TypeVar, Generic
 
-# Placeholder agent class
 class Agent:
     def __init__(self, name: str, instructions: str, model: str = "gpt-4o", output_type: Optional[Any] = None,
                  input_guardrails: Optional[list] = None, handoffs: Optional[list] = None):
@@ -12,7 +11,6 @@ class Agent:
         self.input_guardrails = input_guardrails or []
         self.handoffs = handoffs or []
 
-# Placeholder runner and result
 T = TypeVar("T")
 
 class RunContextWrapper(Generic[T]):
@@ -44,7 +42,6 @@ class Runner:
         else:
             return RunResult(final_output=DummyLabel("Virtual HelpDesk"), last_used_agent=agent)
 
-# Input and label scaffolding
 class TResponseInputItem:
     pass
 
@@ -52,16 +49,13 @@ class DummyLabel:
     def __init__(self, department: str):
         self.department = department
 
-# Guardrail decorator
 def input_guardrail(func):
     async def wrapped(ctx: RunContextWrapper[None], agent: Agent, input_data: Any):
         return await func(ctx, agent, input_data)
     return wrapped
 
-# Exception used in original app
 class InputGuardrailTripwireTriggered(Exception):
     pass
 
-# Dummy key setter
 def set_default_openai_key(api_key: str):
     pass
