@@ -13,7 +13,7 @@ from agents import (
 )
 import holidays
 
-_BACKEND_EXAMPLE_INDEX = 2  # change between 0, 1, 2 for examples 1, 2, 3 respectively
+_BACKEND_EXAMPLE_INDEX = 2
 _client = OpenAI()
 
 class SupportResponse(BaseModel):
@@ -85,12 +85,7 @@ choose exactly one department. Reply ONLY with JSON like:
 {"department": "Hospital Reading Rooms"}
 """,
     output_type=DepartmentLabel,
-    handoffs=[
-        hospital_rr_agent,
-        virtual_helpdesk_agent,
-        wcinyp_agent,
-        radiqal_agent,
-    ],
+    handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
     model="gpt-4o",
     input_guardrails=[radiology_scope_guardrail],
 )
@@ -239,12 +234,12 @@ def generate_faqs(history: list[dict]) -> list[dict]:
             "role": "system",
             "content": (
                 "You are an assistant that transforms user support request history into high-quality FAQs, "
-                "grouped by underlying technical issue or theme (e.g., VPN failures, login loops, application crashes, dictation problems, hardware issues, display settings, etc.)."
+                "grouped by underlying technical issue or theme."
             ),
         }
         user_prompt = (
             "For each theme, output a JSON object with:\n"
-            "- question: a single clear question summarizing that issue (e.g., 'How do I fix VPN connection failures?')\n"
+            "- question: a single clear question summarizing that issue\n"
             "- answer: two parts:\n"
             "    1) brief self-help steps,\n"
             "    2) contact info (department name, phone, email if available).\n"
@@ -263,30 +258,4 @@ def generate_faqs(history: list[dict]) -> list[dict]:
     except Exception:
         pass
 
-    groups: dict[str, list[str]] = {}
-    for entry in history:
-        dept = entry["contact_info"]["Department"]
-        groups.setdefault(dept, []).append(entry["input"])
-
-    faqs: list[dict] = []
-    for dept, inputs in groups.items():
-        q = f"What should I do if I have issues that require {dept} support?"
-        if dept == "Virtual HelpDesk":
-            steps = "Try restarting your desktop and verifying your credentials."
-        elif dept == "WCINYP IT":
-            steps = "Ensure your VPN is connected and check your network settings."
-        elif dept == "Radiqal":
-            steps = "Verify your Radiqal session in Medicalis before submitting a ticket."
-        else:
-            steps = "Restart your system and check for updates."
-
-        contact = SUPPORT_DIRECTORY[dept]
-        ans = f"{steps} If the issue persists, contact {dept} at {contact['phone']}"
-        if contact["email"] != "N/A":
-            ans += f", or email {contact['email']}."
-        else:
-            ans += "."
-
-        faqs.append({"question": q, "answer": ans})
-
-    return faqs
+    return []
