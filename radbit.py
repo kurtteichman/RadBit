@@ -13,7 +13,7 @@ from agents import (
 )
 import holidays
 
-_BACKEND_EXAMPLE_INDEX = 2  # set to 0, 1 or 2 to pick a different backend example
+_BACKEND_EXAMPLE_INDEX = 2  # change between 0, 1, 2 for examples 1, 2, 3 respectively
 _client = OpenAI()
 
 class SupportResponse(BaseModel):
@@ -33,8 +33,6 @@ class DepartmentLabel(BaseModel):
 class OutOfScopeCheck(BaseModel):
     is_off_topic: bool
     explanation: str
-
-# ——— Agents ———
 
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
@@ -165,21 +163,18 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     user_meta = backend["user"]
     ts_meta   = backend["timestamp"]
 
-    # metadata
     name     = user_meta["name"]
     t_str    = ts_meta["time"].split()[0]
     date_str = ts_meta["date"]
     dow      = ts_meta["day_of_week"]
     weekend  = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    # 1) triage
     tri = run_async_task(Runner.run(triage_agent, user_input))
     dept = tri.final_output.department
     if dept not in SUPPORT_DIRECTORY:
         raise ValueError(f"Triage failed, got {dept!r}")
     info = SUPPORT_DIRECTORY[dept]
 
-    # 2) availability/fallback
     now = datetime.strptime(t_str, "%H:%M:%S")
     support_ok = True
     fallback = None
@@ -202,7 +197,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    # 3) email draft via OpenAI client
     msgs = [
         {
             "role": "system",
@@ -239,7 +233,6 @@ def generate_faqs(history: list[dict]) -> list[dict]:
     if not history:
         return []
 
-    # 1) LLM-based grouping by underlying issue/theme
     try:
         sample = history[-20:]
         system_msg = {
@@ -270,7 +263,6 @@ def generate_faqs(history: list[dict]) -> list[dict]:
     except Exception:
         pass
 
-    # 2) Fallback: group by department (minimal coverage)
     groups: dict[str, list[str]] = {}
     for entry in history:
         dept = entry["contact_info"]["Department"]
