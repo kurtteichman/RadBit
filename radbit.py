@@ -255,13 +255,18 @@ def generate_faqs(history: list[dict]) -> list[dict]:
             temperature=0.3,
         )
         content = llm.choices[0].message.content.strip()
+
         try:
-            faqs = json.loads(content)
+            parsed = json.loads(content)
+            if isinstance(parsed, str):
+                parsed = json.loads(parsed)
         except json.JSONDecodeError:
             return [{"question": "Failed to parse LLM response", "answer": content}]
-        if isinstance(faqs, list) and all(isinstance(e, dict) and "question" in e and "answer" in e for e in faqs):
-            return faqs
-    except Exception:
-        return [{"question": "OpenAI API call failed", "answer": "No response generated due to API error."}]
+
+        if isinstance(parsed, list) and all(isinstance(e, dict) and "question" in e and "answer" in e for e in parsed):
+            return parsed
+
+    except Exception as e:
+        return [{"question": "OpenAI API call failed", "answer": str(e)}]
 
     return []
