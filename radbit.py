@@ -3,24 +3,16 @@ import json
 from datetime import datetime
 from pydantic import BaseModel
 from openai import OpenAI
-from agents import (
-    Agent,
-    Runner,
-    input_guardrail,
-    GuardrailFunctionOutput,
-    RunContextWrapper,
-    TResponseInputItem,
-)
+from agents import Agent, Runner, input_guardrail, GuardrailFunctionOutput, RunContextWrapper, TResponseInputItem
 import holidays
 
-# ——— Backend example selector ———
-BACKEND_EXAMPLE_INDEX = 2  # set to 0, 1 or 2 to pick a different record
+# ——— Pick which fake backend entry to use ———
+BACKEND_EXAMPLE_INDEX = 2  # 0, 1, or 2
 
-# ——— OpenAI client ———
-# will read OPENAI_API_KEY from the environment (or Streamlit secrets)
+# ——— Instantiate OpenAI client (reads API key from env or Streamlit secrets) ———
 _client = OpenAI()
 
-# ——— Pydantic models ———
+# ——— Data models ———
 class SupportResponse(BaseModel):
     department: str
     phone: str
@@ -40,18 +32,6 @@ class OutOfScopeCheck(BaseModel):
     explanation: str
 
 # ——— Agents ———
-email_draft_agent = Agent(
-    name="Email Draft Generator",
-    instructions="""
-Write a conversational, polite email summarizing the user's issue.
-Use a human tone, opening with 'To whom it may concern' if no name is known.
-Include what happened, any steps taken, and a request for help.
-Close with 'Thank you' and sign as '{user_name}'.
-Avoid bullet lists or formal report style.
-""",
-    model="gpt-4o"
-)
-
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
     instructions="""
@@ -59,7 +39,7 @@ Determine if the user's message is off-topic (philosophical, existential, etc.).
 Only allow clear radiology/IT support requests through.
 """,
     output_type=OutOfScopeCheck,
-    model="gpt-4o"
+    model="gpt-4o",
 )
 
 @input_guardrail
@@ -153,13 +133,13 @@ def parse_hours_string(hours_string: str):
     s = hours_string.strip()
     if s == "24/7":
         return ("00:00", "23:59")
-    # drop leading "Mon–Fri,"
+    # drop any prefix like "Mon–Fri,"
     if "," in s:
         _, part = s.split(",", 1)
         s = part.strip()
     if "–" in s:
         a, b = s.split("–", 1)
-        clean = lambda t: t.replace(" ", "").replace(" ", "")
+        clean = lambda t: t.replace(" ", "").replace("\u202F", "")
         try:
             return (
                 datetime.strptime(clean(a), "%I%p").strftime("%H:%M"),
@@ -174,26 +154,27 @@ def load_backend_json(path="fake_backend_data.json", index=BACKEND_EXAMPLE_INDEX
         arr = json.load(f)
     return arr[index]
 
-# ——— Core triage + email ———
+# ——— Core triage + email drafting ———
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     backend = load_backend_json()
     user_meta = backend["user"]
-    ts_meta = backend["timestamp"]
+    ts_meta   = backend["timestamp"]
 
+    # extract metadata
     name     = user_meta["name"]
     t_str    = ts_meta["time"].split()[0]
     date_str = ts_meta["date"]
     dow      = ts_meta["day_of_week"]
     weekend  = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    # 1) pick department
+    # 1) department triage
     tri = run_async_task(Runner.run(triage_agent, user_input))
     dept = tri.final_output.department
     if dept not in SUPPORT_DIRECTORY:
         raise ValueError(f"Triage failed, invalid department: {dept!r}")
     info = SUPPORT_DIRECTORY[dept]
 
-    # 2) check availability & find fallback
+    # 2) availability & fallback
     now = datetime.strptime(t_str, "%H:%M:%S")
     support_ok = True
     fallback = None
@@ -216,12 +197,23 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
                             fallback = alt
                             break
 
-    # 3) email draft
-    draft_run = run_async_task(
-        Runner.run(email_draft_agent, f"{user_input} Please sign the email as {name}.")
+    # 3) email draft via OpenAI client (always returns a string)
+    msgs = [
+        {"role": "system", "content": (
+            "You are a professional assistant that writes polite, conversational support request emails.\n"
+            "Open with 'To whom it may concern,' if no recipient name is known.\n"
+            "Summarize the issue described by the user below.\n"
+            f"Close with 'Thank you' and sign as '{name}'.\n"
+            "Avoid bullet lists; write in natural prose."
+        )},
+        {"role": "user", "content": user_input},
+    ]
+    resp = _client.chat.completions.create(
+        model="gpt-4o",
+        messages=msgs,
+        temperature=0.5,
     )
-    raw = draft_run.final_output
-    email_text = raw if isinstance(raw, str) else getattr(raw, "response", str(raw))
+    email_text = resp.choices[0].message.content.strip()
 
     return SupportResponse(
         department=dept,
@@ -235,38 +227,28 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         fallback_department=fallback,
     )
 
-# ——— FAQ generation ———
+# ——— 24-Hour Digest & FAQ generation ———
 def generate_faqs(history: list[dict]) -> list[dict]:
-    """
-    Given a list of history entries (with keys 'input', 'department', 'contact_info', etc.),
-    return up to five FAQs as a list of {"question":..., "answer":...}.
-    """
     if not history:
         return []
-
-    # take only the most recent 20 entries for prompt brevity
     sample = history[-20:]
     prompt = (
-        "You are a radiology support assistant. "
-        "Given this JSON array of recent support requests:\n\n"
+        "You are a radiology support assistant. Given this JSON array of recent support requests:\n\n"
         f"{json.dumps(sample, indent=2)}\n\n"
         "Generate up to five frequently asked questions summarizing the user issues, "
         "and provide concise answers including department name and contact details. "
         "Return valid JSON: a list of objects with 'question' and 'answer' keys."
     )
-
     try:
         resp = _client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Generate FAQs from recent radiology support requests."},
-                {"role": "user", "content": prompt},
+                {"role":"system","content":"Generate FAQs from recent radiology support requests."},
+                {"role":"user","content":prompt}
             ],
             temperature=0.3,
         )
-        text = resp.choices[0].message.content.strip()
-        faqs = json.loads(text)
-        # ensure each item has question & answer
+        faqs = json.loads(resp.choices[0].message.content)
         return [q for q in faqs if "question" in q and "answer" in q]
     except Exception:
         return []
