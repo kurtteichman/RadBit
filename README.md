@@ -12,5 +12,5 @@ Steps to setting up Radbit:
    - under 'Branch', enter 'main'
    - under 'Main File Path', enter 'radbit.py'
    - now press 'Deploy' to start the app
-  
+   - once the app has been created, return to 'My Apps' on your Streamlit home page. Find the app you just made and right-click on the three dots on the right side of      the app ribbon. Navigate to Settings -> Secrets and in the grey box, add the following: OPENAI_API_KEY="[your secret key]"
    
