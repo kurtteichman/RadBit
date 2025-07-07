@@ -3,10 +3,17 @@ import json
 from datetime import datetime
 from pydantic import BaseModel
 from openai import OpenAI
-from agents import Agent, Runner, input_guardrail, GuardrailFunctionOutput, RunContextWrapper, TResponseInputItem
+from agents import (
+    Agent,
+    Runner,
+    input_guardrail,
+    GuardrailFunctionOutput,
+    RunContextWrapper,
+    TResponseInputItem,
+)
 import holidays
 
-BACKEND_EXAMPLE_INDEX = 2  # 0, 1, or 2
+_BACKEND_EXAMPLE_INDEX = 2  # set 0, 1 or 2
 
 _client = OpenAI()
 
@@ -29,6 +36,7 @@ class OutOfScopeCheck(BaseModel):
     explanation: str
 
 # ——— Agents ———
+
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
     instructions="""
@@ -143,7 +151,7 @@ def parse_hours_string(hours_string: str):
             return None
     return None
 
-def load_backend_json(path="fake_backend_data.json", index=BACKEND_EXAMPLE_INDEX):
+def load_backend_json(path="fake_backend_data.json", index=_BACKEND_EXAMPLE_INDEX):
     with open(path, "r") as f:
         arr = json.load(f)
     return arr[index]
@@ -221,49 +229,65 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     )
 
 def generate_faqs(history: list[dict]) -> list[dict]:
-    # Try LLM-based FAQs first
-    if history:
-        sample = history[-20:]
-        user_prompt = (
-            "Given this JSON array of recent support requests:\n\n"
-            f"{json.dumps(sample, indent=2)}\n\n"
-            "Generate up to five FAQs with keys 'question' and 'answer', "
-            "where questions rephrase the user issues and answers "
-            "include department and contact info. Return valid JSON array."
-        )
-        try:
-            resp = _client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role":"system","content":"Generate FAQs from recent radiology support requests."},
-                    {"role":"user","content": user_prompt}
-                ],
-                temperature=0.3,
-            )
-            faqs = json.loads(resp.choices[0].message.content)
-            if isinstance(faqs, list) and all("question" in q and "answer" in q for q in faqs):
-                return faqs
-        except Exception:
-            pass
+    if not history:
+        return []
 
-    # Fallback: pick up to 5 most recent distinct inputs
-    fallback = []
-    seen = set()
-    for entry in reversed(history):
-        inp = entry["input"]
-        if inp in seen:
-            continue
-        seen.add(inp)
+    # 1) Attempt LLM-based, theme-grouping FAQ synthesis
+    try:
+        sample = history[-20:]
+        prompt = (
+            "You are an assistant that groups similar radiology/IT support requests into themes.\n"
+            "For each theme, write a concise FAQ entry with:\n"
+            "- question: a single natural-language question covering that theme\n"
+            "- answer: two parts:\n"
+            "    1) brief self-help steps,\n"
+            "    2) department contact info (dept name, phone, email if available)\n"
+            "Return a JSON array of up to 5 entries.\n\n"
+            f"Here are recent requests:\n{json.dumps(sample, indent=2)}"
+        )
+        llm = _client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Generate grouped FAQs from support request history."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+        )
+        faqs = json.loads(llm.choices[0].message.content)
+        if isinstance(faqs, list) and all("question" in e and "answer" in e for e in faqs):
+            return faqs
+    except Exception:
+        pass
+
+    # 2) Fallback: one FAQ per department group
+    groups: dict[str, list[str]] = {}
+    for entry in history:
         dept = entry["contact_info"]["Department"]
-        phone = entry["contact_info"]["Phone"]
-        email = entry["contact_info"].get("Email","")
-        ans = f"For \"{inp}\" contact {dept} at {phone}"
-        if email and email != "N/A":
-            ans += f", email {email}."
+        groups.setdefault(dept, []).append(entry["input"])
+
+    faqs: list[dict] = []
+    for dept, inputs in groups.items():
+        # generic question for that department
+        q = f"What should I do if I have issues that require {dept} support?"
+        # simple self-help advice per department
+        if dept == "Virtual HelpDesk":
+            steps = "Try restarting your desktop and verifying your credentials."
+        elif dept == "WCINYP IT":
+            steps = "Ensure your VPN is connected and check your network settings."
+        elif dept == "Radiqal":
+            steps = "Verify your Radiqal session in Medicalis before submitting a ticket."
+        else:
+            steps = "Restart your system and check for updates."
+
+        contact = SUPPORT_DIRECTORY[dept]
+        ans = (
+            f"{steps} If the issue persists, contact {dept} at {contact['phone']}"
+        )
+        if contact["email"] != "N/A":
+            ans += f", or email {contact['email']}."
         else:
             ans += "."
-        fallback.append({"question": inp, "answer": ans})
-        if len(fallback) >= 5:
-            break
 
-    return fallback
+        faqs.append({"question": q, "answer": ans})
+
+    return faqs
