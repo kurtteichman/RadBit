@@ -1,3 +1,4 @@
+
 import asyncio
 import json
 from datetime import datetime
@@ -138,7 +139,7 @@ def parse_hours_string(hours_string: str):
         s = part.strip()
     if "–" in s:
         a, b = s.split("–", 1)
-        clean = lambda t: t.replace(" ", "").replace("\u202F", "")
+        clean = lambda t: t.replace(" ", "").replace(" ", "")
         try:
             return (
                 datetime.strptime(clean(a), "%I%p").strftime("%H:%M"),
@@ -196,10 +197,14 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         {
             "role": "system",
             "content": (
-                "You are a professional assistant that writes polite, conversational support request emails.\n"
-                "Open with 'To whom it may concern,' if no recipient name is known.\n"
-                "Summarize the issue described by the user below.\n"
-                f"Close with 'Thank you' and sign as '{name}'.\n"
+                "You are a professional assistant that writes polite, conversational support request emails.
+"
+                "Open with 'To whom it may concern,' if no recipient name is known.
+"
+                "Summarize the issue described by the user below.
+"
+                f"Close with 'Thank you' and sign as '{name}'.
+"
                 "Avoid bullet lists; write in natural prose."
             ),
         },
@@ -235,16 +240,21 @@ def generate_faqs(history: list[dict]) -> list[dict]:
         "content": (
             "You are an expert assistant that reads user support request descriptions "
             "and groups them by technical theme (e.g., VPN issues, login loops). "
-            "For each theme, produce a JSON object with keys:\n"
-            "- question: a short user-like question\n"
-            "- steps: a list of clear self-help suggestions\n"
-            "- input_example: the exact original user request most relevant to this theme\n"
+            "For each theme, produce a JSON object with keys:
+"
+            "- question: a short user-like question
+"
+            "- steps: a list of clear self-help suggestions
+"
+            "- input_example: the exact original user request most relevant to this theme
+"
             "Return up to five objects as a JSON array."
         ),
     }
     user_msg = {
         "role": "user",
-        "content": f"Here are recent support requests:\n{json.dumps(inputs, indent=2)}"
+        "content": f"Here are recent support requests:
+{json.dumps(inputs, indent=2)}"
     }
 
     try:
@@ -267,13 +277,14 @@ def generate_faqs(history: list[dict]) -> list[dict]:
             dept = triage.final_output.department
             contact = SUPPORT_DIRECTORY.get(dept, {})
             steps = faq.get("steps", [])
-            answer = "Self-Help Steps:\n" + "\n".join(f"- {s}" for s in steps)
-            answer += "\n\nRecommended Support Contact:"
-            answer += f"\nDepartment: {dept}"
+            answer = "### Self-Help Steps
+" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
+            answer += "\n\n### Recommended Support Contact"
+            answer += f"\n**Department**: {dept}"
             if contact.get("phone"):
-                answer += f"\nPhone: {contact['phone']}"
+                answer += f"\n**Phone**: {contact['phone']}"
             if contact.get("email"):
-                answer += f"\nEmail: {contact['email']}"
+                answer += f"\n**Email**: {contact['email']}"
             results.append({"question": faq.get("question", "FAQ"), "answer": answer})
 
         return results
