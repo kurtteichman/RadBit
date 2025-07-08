@@ -196,14 +196,10 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         {
             "role": "system",
             "content": (
-                "You are a professional assistant that writes polite, conversational support request emails.
-"
-                "Open with 'To whom it may concern,' if no recipient name is known.
-"
-                "Summarize the issue described by the user below.
-"
-                f"Close with 'Thank you' and sign as '{name}'.
-"
+                "You are a professional assistant that writes polite, conversational support request emails."
+                "Open with 'To whom it may concern,' if no recipient name is known."
+                "Summarize the issue described by the user below."
+                f"Close with 'Thank you' and sign as '{name}'."
                 "Avoid bullet lists; write in natural prose."
             ),
         },
@@ -239,14 +235,10 @@ def generate_faqs(history: list[dict]) -> list[dict]:
         "content": (
             "You are an expert assistant that reads user support request descriptions "
             "and groups them by technical theme (e.g., VPN issues, login loops). "
-            "For each theme, produce a JSON object with keys:
-"
-            "- question: a short user-like question
-"
-            "- steps: a list of clear self-help suggestions
-"
-            "- input_example: the exact original user request most relevant to this theme
-"
+            "For each theme, produce a JSON object with keys:"
+            "- question: a short user-like question"
+            "- steps: a list of clear self-help suggestions"
+            "- input_example: the exact original user request most relevant to this theme"
             "Return up to five objects as a JSON array."
         ),
     }
@@ -276,8 +268,7 @@ def generate_faqs(history: list[dict]) -> list[dict]:
             dept = triage.final_output.department
             contact = SUPPORT_DIRECTORY.get(dept, {})
             steps = faq.get("steps", [])
-            answer = "### Self-Help Steps
-" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
+            answer = "### Self-Help Steps" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
             answer += "\n\n### Recommended Support Contact"
             answer += f"\n**Department**: {dept}"
             if contact.get("phone"):
