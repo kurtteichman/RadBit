@@ -244,8 +244,7 @@ def generate_faqs(history: list[dict]) -> list[dict]:
     }
     user_msg = {
         "role": "user",
-        "content": f"Here are recent support requests:
-{json.dumps(inputs, indent=2)}"
+        "content": f"Here are recent support requests: {json.dumps(inputs, indent=2)}"
     }
 
     try:
