@@ -267,7 +267,7 @@ def generate_faqs(history: list[dict]) -> list[dict]:
             dept = triage.final_output.department
             contact = SUPPORT_DIRECTORY.get(dept, {})
             steps = faq.get("steps", [])
-            answer = "### Self-Help Steps\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
+            answer = "\n### Self-Help Steps\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
             answer += "\n\n### Recommended Support Contact"
             answer += f"\n**Department**: {dept}"
             if contact.get("phone"):
