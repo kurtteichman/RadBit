@@ -89,6 +89,8 @@ with left:
         st.markdown(f"**Department:** {r.department}")
         st.markdown(f"**Phone:** {r.phone}")
         st.markdown("**Email:**")
+        if r.department == 'WCINYP IT':
+            st.markdown("")
         for line in r.email.strip().split("\n"):
             if line.strip():
                 st.markdown(line)
@@ -106,21 +108,22 @@ with right:
 
         it_context = backend_meta.get("it_context", {})
         footer_lines = [
+        "",
+        "----------------------------------------",
+        " IT CONTEXT",
+        "----------------------------------------",
             "",
-            "----------------------------------------",
-            " IT CONTEXT",
-            "----------------------------------------",
-            f"IP Address: {it_context.get('ip_address', 'N/A')}",
-            f"Location: {it_context.get('location', 'N/A')}",
-            f"Phone Number: {it_context.get('phone_number', 'N/A')}",
-            f"VPN: {it_context.get('vpn', 'N/A')}",
-            f"Browser: {it_context.get('browser_user_agent', 'N/A')}",
-            f"PACS Version: {it_context.get('pacs_version', 'N/A')}",
-            f"Medicalis Version: {it_context.get('medicalis_version', 'N/A')}",
-            f"Fluency Version: {it_context.get('fluency_version', 'N/A')}",
-            f"OS Version: {it_context.get('os_version', 'N/A')}"
+            "---",
+            f"- IP Address: {it_context.get('ip_address', 'N/A')}",
+            f"- Location: {it_context.get('location', 'N/A')}",
+            f"- Phone Number: {it_context.get('phone_number', 'N/A')}",
+            f"- VPN: {it_context.get('vpn', 'N/A')}",
+            f"- Browser: {it_context.get('browser_user_agent', 'N/A')}",
+            f"- PACS Version: {it_context.get('pacs_version', 'N/A')}",
+            f"- Medicalis Version: {it_context.get('medicalis_version', 'N/A')}",
+            f"- Fluency Version: {it_context.get('fluency_version', 'N/A')}",
+            f"- OS Version: {it_context.get('os_version', 'N/A')}"
         ]
-
         email_with_footer = st.session_state.triage_result.email_draft + "\n" + "\n".join(footer_lines)
         st.text_area("Edit before sending", value=email_with_footer, height=400, key="email_draft_box")
         st.button("Send Email", disabled=True)
