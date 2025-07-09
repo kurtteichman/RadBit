@@ -5,7 +5,12 @@ import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
 from radbit import triage_and_get_support_info, generate_faqs
 
-set_default_openai_key(st.secrets["OPENAI_API_KEY"])
+#set_default_openai_key(st.secrets["OPENAI_API_KEY"])
+if 'OPENAI_API_KEY' in os.environ:
+    set_default_openai_key(os.environ["OPENAI_API_KEY"])
+else:
+    set_default_openai_key(st.secrets["OPENAI_API_KEY"])
+
 st.set_page_config(page_title="Radiology Support", layout="wide")
 
 HISTORY_FILE = "triage_history.json"
