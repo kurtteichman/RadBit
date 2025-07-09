@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
-from radbit import triage_and_get_support_info, generate_faqs
+from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
 
 #set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 if 'OPENAI_API_KEY' in os.environ:
@@ -12,6 +12,15 @@ else:
     set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 
 st.set_page_config(page_title="Radiology Support", layout="wide")
+
+backend_meta = load_backend_json()
+ts = backend_meta["timestamp"]
+
+with st.sidebar:
+    st.markdown("### Timestamp")
+    st.markdown(f"**Date:** {ts['date']}")
+    st.markdown(f"**Time:** {ts['time']}")
+    st.markdown(f"**Day:** {ts['day_of_week']}")
 
 HISTORY_FILE = "triage_history.json"
 
@@ -84,7 +93,12 @@ with left:
         st.markdown("### Recommended Support Contact")
         st.markdown(f"**Department:** {r.department}")
         st.markdown(f"**Phone:** {r.phone}")
-        st.markdown(f"**Email:** {r.email}")
+        st.markdown("**Email:**")
+        if r.department == 'WCINYP IT':
+            st.markdown("")
+        for line in r.email.strip().split("\n"):
+            if line.strip():
+                st.markdown(line)
         st.markdown(f"**Other Info:** {r.other}")
         st.markdown(f"**Note:** {r.note}")
         st.markdown(f"**Availability:** {r.hours}")
@@ -96,7 +110,27 @@ with left:
 with right:
     if st.session_state.triage_result and st.session_state.show_email_draft:
         st.subheader("Email Draft")
-        st.text_area("Edit before sending", value=st.session_state.triage_result.email_draft, height=400, key="email_draft_box")
+
+        it_context = backend_meta.get("it_context", {})
+        footer_lines = [
+        "",
+        "----------------------------------------",
+        " IT CONTEXT",
+        "----------------------------------------",
+            "",
+            "---",
+            f"- IP Address: {it_context.get('ip_address', 'N/A')}",
+            f"- Location: {it_context.get('location', 'N/A')}",
+            f"- Phone Number: {it_context.get('phone_number', 'N/A')}",
+            f"- VPN: {it_context.get('vpn', 'N/A')}",
+            f"- Browser: {it_context.get('browser_user_agent', 'N/A')}",
+            f"- PACS Version: {it_context.get('pacs_version', 'N/A')}",
+            f"- Medicalis Version: {it_context.get('medicalis_version', 'N/A')}",
+            f"- Fluency Version: {it_context.get('fluency_version', 'N/A')}",
+            f"- OS Version: {it_context.get('os_version', 'N/A')}"
+        ]
+        email_with_footer = st.session_state.triage_result.email_draft + "\n" + "\n".join(footer_lines)
+        st.text_area("Edit before sending", value=email_with_footer, height=400, key="email_draft_box")
         st.button("Send Email", disabled=True)
 
 st.divider()

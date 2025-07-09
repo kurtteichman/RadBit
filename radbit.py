@@ -80,9 +80,18 @@ radiqal_agent = Agent(
 triage_agent = Agent(
     name="Support Triage Agent",
     instructions="""
-Based on the user's description and context (subspecialty, time, location),
-choose exactly one department. Reply ONLY with JSON like:
-{"department": "Hospital Reading Rooms"}
+Given a user support issue, choose exactly one of the following departments and return only JSON: 
+{"department": "Hospital Reading Rooms"}, 
+{"department": "Virtual HelpDesk"}, 
+{"department": "WCINYP IT"}, 
+{"department": "Radiqal"}
+
+Use the following examples as guidance:
+
+- WCINYP IT: Issues with display scaling, gaming mouse speed, duplicate dictation, VuePACS lossy images, Stat DX not launching, hardware problems, server address corrections (Olea/TeraRecon/Dynacad), or general workstation/network setup.
+- Radiqal: Mouse macros not working in G HUB, unable to access Fluency templates, or unable to view outside studies in VuePACS — particularly when related to Radiqal or QA systems.
+
+Decide only based on the issue type and nature — not personal preference or tone. Do not return multiple departments.
 """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
@@ -106,11 +115,15 @@ SUPPORT_DIRECTORY = {
         "hours": "Mon–Fri, 9 AM–5 PM",
     },
     "WCINYP IT": {
-        "phone": "(212) 746-4878",
-        "email": "wcinypit@med.cornell.edu",
-        "other": "Contact via myHelpdesk portal 24/7",
-        "note": "Home VPN / EPIC / Outlook issues",
-        "hours": "7 AM–7 PM",
+        "phone": "Phone Support (24/7): 4-HELP (212-746-4357)",
+        "email": (
+            "• Normal Requests (24/7): nypradtickets@nyp.org"
+            "\n• On-Call (5 PM–8 AM): nypradoncall@nyp.org"
+            " \n(Use for high-priority, patient-care-impacting issues)"
+        ),
+        "other": "Zoom Support (Mon–Fri, 9 AM–5 PM): https://nyph.zoom.us/j/9956909465",
+        "note": "For support with Vue PACS, Medicalis, Fluency, and Diagnostic Workstations.",
+        "hours": "See Above",
     },
     "Radiqal": {
         "phone": "N/A",
@@ -172,7 +185,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     now = datetime.strptime(t_str, "%H:%M:%S")
     support_ok = True
-    fallback = None
+    fallback = "Radiqal"
     if info["hours"].strip() != "24/7":
         rng = parse_hours_string(info["hours"])
         if rng:
@@ -181,16 +194,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
             is_hol = date_str in holidays.US()
             if not (start <= now <= end) or dow in ("Sat","Sun") or weekend or is_hol:
                 support_ok = False
-                for alt, alt_info in SUPPORT_DIRECTORY.items():
-                    if alt == dept or alt_info["hours"].strip() == "24/7":
-                        continue
-                    r2 = parse_hours_string(alt_info["hours"])
-                    if r2:
-                        s2 = datetime.strptime(r2[0], "%H:%M")
-                        e2 = datetime.strptime(r2[1], "%H:%M")
-                        if s2 <= now <= e2:
-                            fallback = alt
-                            break
 
     msgs = [
         {
