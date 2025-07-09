@@ -60,30 +60,30 @@ def keyword_based_department_routing(user_input: str) -> str | None:
     text = user_input.lower()
     if any(kw in text for kw in ["mouse speed", "gaming mouse", "change mouse sensitivity"]):
         return "WCINYP IT"
-    if any(kw in text for kw in ["g hub", "mouse macro"]):
+    if any(kw in text for kw in ["g hub", "mouse macro", "macros on my mouse"]):
         return "Radiqal"
-    if any(kw in text for kw in ["screen scaling", "display scaling"]):
+    if any(kw in text for kw in ["screen scaling", "display scaling", "adjust display settings", "first time logging in"]):
         return "WCINYP IT"
     return None
 
 hospital_rr_agent = Agent(
     name="Hospital Reading Rooms Agent",
-    instructions="Handle clinical PACS/viewer crashes or freezes during CT/MRI interpretation.",
+    instructions="Support for issues during image interpretation in PACS systems like viewer freezes, CT/MRI image crashes, or diagnostic disruptions.",
     model="gpt-4o",
 )
 virtual_helpdesk_agent = Agent(
     name="Virtual HelpDesk Agent",
-    instructions="Handle in-hospital desktop/login or certificate issues; Zoom support available.",
+    instructions="Only handle in-hospital workstation access problems (e.g., badge logins, password resets, SSO/certificates). Do NOT handle workstation software, macros, display settings, PACS viewers, or hardware config.",
     model="gpt-4o",
 )
 wcinyp_agent = Agent(
     name="WCINYP IT Agent",
-    instructions="Handle remote/home issues: VPN, Outlook, EPIC, email sync.",
+    instructions="Handle home/remote setup issues (e.g., VPN, EPIC, Outlook, keyboard/mouse setup, display scaling, VuePACS config, hardware problems, software installs, peripheral calibration). Also covers first-time login setup.",
     model="gpt-4o",
 )
 radiqal_agent = Agent(
     name="Radiqal Agent",
-    instructions="Handle QA/discrepancy tickets via Radiqal within PACS.",
+    instructions="Handle QA workflow breakdowns, missing templates, and system-specific issues in Radiqal, Fluency, or PACS integrations involving macros or viewer behaviors.",
     model="gpt-4o",
 )
 
@@ -96,28 +96,58 @@ Given a user support issue, choose exactly one of the following departments and 
 {"department": "WCINYP IT"}, 
 {"department": "Radiqal"}
 
-Match issue types to departments as follows:
+Use this rule set:
 
-- WCINYP IT: Hardware problems (e.g., monitor scaling, gaming mouse sensitivity), workstation setup, network config (VPN, EPIC, Outlook), VuePACS image quality issues, Stat DX browser settings, Fluency app dictation issues, incorrect server addresses (Olea, TeraRecon, Dynacad).
-- Virtual HelpDesk: In-hospital support for login issues, system access, authentication, and certificates.
-- Radiqal: QA platform and reporting tool issues (e.g., Radiqal not working, Fluency template access failures, outside studies inaccessible due to permissions or system configuration).
-- Hospital Reading Rooms: PACS viewer freezing or crashing while interpreting scans (CT, MRI, etc.).
+- WCINYP IT: Issues with display scaling, gaming mouse speed, duplicate dictation, VuePACS lossy images, Stat DX not launching, hardware setup, server address corrections (Olea/TeraRecon/Dynacad), monitor config, workstation behavior, or onboarding/first-login screen layout problems.
 
-Examples:
-- "I can't change my mouse speed" → WCINYP IT
-- "Mouse macros aren't registering in G HUB" → Radiqal
-- "My screen scaling is off after installing the app" → WCINYP IT
-- "I can't log into the workstation on campus" → Virtual HelpDesk
-- "The PACS viewer froze during a read" → Hospital Reading Rooms
-- "I can't access Fluency templates or outside VuePACS cases" → Radiqal
+- Radiqal: Issues involving macros in G HUB, missing or broken Fluency templates, inability to view outside studies in VuePACS, and all QA workflow/platform discrepancies or tip sheet-based platforms.
 
-Only return a single JSON object with the department.
+- Hospital Reading Rooms: Crashes/freezes of the PACS viewer during interpretation, sudden PACS lockups, or reading disruptions that affect diagnostic throughput.
+
+- Virtual HelpDesk: In-hospital desktop login/certificate/access problems (badge, Duo, SSO), ONLY if no mention of hardware config or software calibration.
+
+Return JSON exactly like {"department": "Radiqal"}.
 """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
     model="gpt-4o",
     input_guardrails=[radiology_scope_guardrail],
 )
+
+SUPPORT_DIRECTORY = {
+    "Hospital Reading Rooms": {
+        "phone": "4-HELP (4-4357) or (212) 932-4357",
+        "email": "servicedesk@nyp.org (Subject: RADSUPPORTEASTCRITICAL)",
+        "other": "N/A",
+        "note": "Clinical PACS workstation support",
+        "hours": "24/7",
+    },
+    "Virtual HelpDesk": {
+        "phone": "(212) 746-4878",
+        "email": "N/A",
+        "other": "Zoom: https://nyph.zoom.us/j/9956909465",
+        "note": "Support via Zoom sessions",
+        "hours": "Mon–Fri, 9 AM–5 PM",
+    },
+    "WCINYP IT": {
+        "phone": "Phone Support (24/7): 4-HELP (212-746-4357)",
+        "email": (
+            "• Normal Requests (24/7): nypradtickets@nyp.org"
+            "\n• On-Call (5 PM–8 AM): nypradoncall@nyp.org"
+            " \n(Use for high-priority, patient-care-impacting issues)"
+        ),
+        "other": "Zoom Support (Mon–Fri, 9 AM–5 PM): https://nyph.zoom.us/j/9956909465",
+        "note": "For support with Vue PACS, Medicalis, Fluency, and Diagnostic Workstations.",
+        "hours": "See Above",
+    },
+    "Radiqal": {
+        "phone": "N/A",
+        "email": "N/A - use Radiqal within Medicalis/VuePACS",
+        "other": "Use Radiqal Tip Sheet guidance",
+        "note": "QA system support",
+        "hours": "Platform dependent",
+    },
+}
 
 SUPPORT_DIRECTORY = {
     "Hospital Reading Rooms": {
