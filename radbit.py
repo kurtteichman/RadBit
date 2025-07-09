@@ -56,6 +56,16 @@ async def radiology_scope_guardrail(
         tripwire_triggered=out.final_output.is_off_topic,
     )
 
+def keyword_based_department_routing(user_input: str) -> str | None:
+    text = user_input.lower()
+    if any(kw in text for kw in ["mouse speed", "gaming mouse", "change mouse sensitivity"]):
+        return "WCINYP IT"
+    if any(kw in text for kw in ["g hub", "mouse macro"]):
+        return "Radiqal"
+    if any(kw in text for kw in ["screen scaling", "display scaling"]):
+        return "WCINYP IT"
+    return None
+
 hospital_rr_agent = Agent(
     name="Hospital Reading Rooms Agent",
     instructions="Handle clinical PACS/viewer crashes or freezes during CT/MRI interpretation.",
@@ -177,6 +187,13 @@ def load_backend_json(path="fake_backend_data.json", index=_BACKEND_EXAMPLE_INDE
     return arr[index]
 
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
+    dept = keyword_based_department_routing(user_input)
+    if not dept:
+        tri = run_async_task(Runner.run(triage_agent, user_input))
+        dept = tri.final_output.department
+    if dept not in SUPPORT_DIRECTORY:
+        raise ValueError(f"Triage failed, got {dept!r}")
+
     backend = load_backend_json()
     user_meta = backend["user"]
     ts_meta   = backend["timestamp"]
@@ -187,10 +204,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     dow      = ts_meta["day_of_week"]
     weekend  = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    tri = run_async_task(Runner.run(triage_agent, user_input))
-    dept = tri.final_output.department
-    if dept not in SUPPORT_DIRECTORY:
-        raise ValueError(f"Triage failed, got {dept!r}")
     info = SUPPORT_DIRECTORY[dept]
 
     now = datetime.strptime(t_str, "%H:%M:%S")
@@ -236,62 +249,3 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
         support_available=support_ok,
         fallback_department=fallback,
     )
-
-def generate_faqs(history: list[dict]) -> list[dict]:
-    if not history:
-        return []
-
-    inputs = [entry["input"] for entry in history][-20:]
-
-    system_msg = {
-        "role": "system",
-        "content": (
-            "You are an expert assistant that reads user support request descriptions "
-            "and groups them by technical theme (e.g., VPN issues, login loops). "
-            "For each theme, produce a JSON object with keys:"
-            "- question: a short user-like question"
-            "- steps: a list of clear self-help suggestions"
-            "- input_example: the exact original user request most relevant to this theme"
-            "Return up to five objects as a JSON array."
-        ),
-    }
-    user_msg = {
-        "role": "user",
-        "content": f"Here are recent support requests: {json.dumps(inputs, indent=2)}"
-    }
-
-    try:
-        llm = _client.chat.completions.create(
-            model="gpt-4o",
-            messages=[system_msg, user_msg],
-            temperature=0.3,
-        )
-        content = llm.choices[0].message.content.strip()
-        if content.startswith("```json"):
-            content = content.removeprefix("```json").removesuffix("```").strip()
-        parsed = json.loads(content)
-        if isinstance(parsed, str):
-            parsed = json.loads(parsed)
-
-        results = []
-        for faq in parsed:
-            input_example = faq.get("input_example", "")
-            triage = run_async_task(Runner.run(triage_agent, input_example))
-            dept = triage.final_output.department
-            contact = SUPPORT_DIRECTORY.get(dept, {})
-            steps = faq.get("steps", [])
-            answer = "\n### Self-Help Steps\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
-            answer += "\n\n### Recommended Support Contact"
-            answer += f"\n**Department**: {dept}"
-            if contact.get("phone"):
-                answer += f"\n**Phone**: {contact['phone']}"
-            if contact.get("email"):
-                answer += f"\n**Email**: {contact['email']}"
-            results.append({"question": faq.get("question", "FAQ"), "answer": answer})
-
-        return results
-
-    except Exception as e:
-        return [{"question": "OpenAI API call failed", "answer": str(e)}]
-
-    return []
