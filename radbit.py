@@ -80,9 +80,18 @@ radiqal_agent = Agent(
 triage_agent = Agent(
     name="Support Triage Agent",
     instructions="""
-Based on the user's description and context (subspecialty, time, location),
-choose exactly one department. Reply ONLY with JSON like:
-{"department": "Hospital Reading Rooms"}
+Given a user support issue, choose exactly one of the following departments and return only JSON: 
+{"department": "Hospital Reading Rooms"}, 
+{"department": "Virtual HelpDesk"}, 
+{"department": "WCINYP IT"}, 
+{"department": "Radiqal"}
+
+Use the following examples as guidance:
+
+- WCINYP IT: Issues with display scaling, gaming mouse speed, duplicate dictation, VuePACS lossy images, Stat DX not launching, hardware problems, server address corrections (Olea/TeraRecon/Dynacad), or general workstation/network setup.
+- Radiqal: Mouse macros not working in G HUB, unable to access Fluency templates, or unable to view outside studies in VuePACS — particularly when related to Radiqal or QA systems.
+
+Decide only based on the issue type and nature — not personal preference or tone. Do not return multiple departments.
 """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
