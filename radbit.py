@@ -86,12 +86,22 @@ Given a user support issue, choose exactly one of the following departments and 
 {"department": "WCINYP IT"}, 
 {"department": "Radiqal"}
 
-Use the following examples as guidance:
+Match issue types to departments as follows:
 
-- WCINYP IT: Issues with display scaling, gaming mouse speed, duplicate dictation, VuePACS lossy images, Stat DX not launching, hardware problems, server address corrections (Olea/TeraRecon/Dynacad), or general workstation/network setup.
-- Radiqal: Mouse macros not working in G HUB, unable to access Fluency templates, or unable to view outside studies in VuePACS — particularly when related to Radiqal or QA systems.
+- WCINYP IT: Hardware problems (e.g., monitor scaling, gaming mouse sensitivity), workstation setup, network config (VPN, EPIC, Outlook), VuePACS image quality issues, Stat DX browser settings, Fluency app dictation issues, incorrect server addresses (Olea, TeraRecon, Dynacad).
+- Virtual HelpDesk: In-hospital support for login issues, system access, authentication, and certificates.
+- Radiqal: QA platform and reporting tool issues (e.g., Radiqal not working, Fluency template access failures, outside studies inaccessible due to permissions or system configuration).
+- Hospital Reading Rooms: PACS viewer freezing or crashing while interpreting scans (CT, MRI, etc.).
 
-Decide only based on the issue type and nature — not personal preference or tone. Do not return multiple departments.
+Examples:
+- "I can't change my mouse speed" → WCINYP IT
+- "Mouse macros aren't registering in G HUB" → Radiqal
+- "My screen scaling is off after installing the app" → WCINYP IT
+- "I can't log into the workstation on campus" → Virtual HelpDesk
+- "The PACS viewer froze during a read" → Hospital Reading Rooms
+- "I can't access Fluency templates or outside VuePACS cases" → Radiqal
+
+Only return a single JSON object with the department.
 """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
