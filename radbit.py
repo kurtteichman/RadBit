@@ -106,11 +106,15 @@ SUPPORT_DIRECTORY = {
         "hours": "Mon–Fri, 9 AM–5 PM",
     },
     "WCINYP IT": {
-        "phone": "(212) 746-4878",
-        "email": "wcinypit@med.cornell.edu",
-        "other": "Contact via myHelpdesk portal 24/7",
-        "note": "Home VPN / EPIC / Outlook issues",
-        "hours": "7 AM–7 PM",
+        "phone": "Phone Support (24/7): 4-HELP (212-746-4357)",
+        "email": (
+            "• Normal Requests (24/7): nypradtickets@nyp.org\n"
+            "• On-Call (5 PM–8 AM): nypradoncall@nyp.org\n"
+            "  (Use for high-priority, patient-care-impacting issues)"
+        ),
+        "other": "Zoom Support (Mon–Fri, 9 AM–5 PM): https://nyph.zoom.us/j/9956909465",
+        "note": "For support with Vue PACS, Medicalis, Fluency, and Diagnostic Workstations.",
+        "hours": "See Above",
     },
     "Radiqal": {
         "phone": "N/A",
