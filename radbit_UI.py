@@ -88,7 +88,9 @@ with left:
         st.markdown("### Recommended Support Contact")
         st.markdown(f"**Department:** {r.department}")
         st.markdown(f"**Phone:** {r.phone}")
-        st.markdown(f"**Email:** {r.email}")
+        st.markdown("**Email:**")
+        for line in r.email.split("\n"):
+            st.markdown(line)
         st.markdown(f"**Other Info:** {r.other}")
         st.markdown(f"**Note:** {r.note}")
         st.markdown(f"**Availability:** {r.hours}")
