@@ -120,7 +120,6 @@ footer_lines = [
     f"- OS Version: {it_context.get('os_version', 'N/A')}"
 ]
 email_with_footer = st.session_state.triage_result.email_draft + "\n" + "\n".join(footer_lines)
-
         st.text_area("Edit before sending", value=email_with_footer, height=400, key="email_draft_box")
         st.button("Send Email", disabled=True)
 
