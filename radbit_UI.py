@@ -93,7 +93,7 @@ with left:
                 if line.strip():
                     st.markdown(f"{line}")
         else:
-            st.markdown(f"**Email:** {r.email}")
+            st.markdown("**Email:**\n" + r.email if "\n" in r.email else f"**Email:** {r.email}")
         st.markdown(f"**Other Info:** {r.other}")
         st.markdown(f"**Note:** {r.note}")
         st.markdown(f"**Availability:** {r.hours}")
