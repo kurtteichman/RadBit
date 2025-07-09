@@ -12,7 +12,7 @@ backend_meta = load_backend_json()
 ts = backend_meta["timestamp"]
 
 with st.sidebar:
-    st.markdown("### System Timestamp")
+    st.markdown("### Timestamp")
     st.markdown(f"**Date:** {ts['date']}")
     st.markdown(f"**Time:** {ts['time']}")
     st.markdown(f"**Day:** {ts['day_of_week']}")
