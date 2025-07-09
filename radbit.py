@@ -107,7 +107,7 @@ SUPPORT_DIRECTORY = {
     },
     "WCINYP IT": {
         "phone": "Phone Support (24/7): 4-HELP (212-746-4357)",
-        "f'''email": (
+        "email": (
             "\n• Normal Requests (24/7): nypradtickets@nyp.org"
             "\n• On-Call (5 PM–8 AM): nypradoncall@nyp.org"
             " \n(Use for high-priority, patient-care-impacting issues)"
