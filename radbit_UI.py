@@ -3,10 +3,19 @@ import os
 from datetime import datetime
 import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
-from radbit import triage_and_get_support_info, generate_faqs
+from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
+
+backend_meta = load_backend_json()
+ts = backend_meta["timestamp"]
+
+with st.sidebar:
+    st.markdown("### System Timestamp")
+    st.markdown(f"**Date:** {ts['date']}")
+    st.markdown(f"**Time:** {ts['time']}")
+    st.markdown(f"**Day:** {ts['day_of_week']}")
 
 HISTORY_FILE = "triage_history.json"
 
