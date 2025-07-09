@@ -176,7 +176,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     now = datetime.strptime(t_str, "%H:%M:%S")
     support_ok = True
-    fallback = None
+    fallback = "Radiqal"
     if info["hours"].strip() != "24/7":
         rng = parse_hours_string(info["hours"])
         if rng:
@@ -185,16 +185,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
             is_hol = date_str in holidays.US()
             if not (start <= now <= end) or dow in ("Sat","Sun") or weekend or is_hol:
                 support_ok = False
-                for alt, alt_info in SUPPORT_DIRECTORY.items():
-                    if alt == dept or alt_info["hours"].strip() == "24/7":
-                        continue
-                    r2 = parse_hours_string(alt_info["hours"])
-                    if r2:
-                        s2 = datetime.strptime(r2[0], "%H:%M")
-                        e2 = datetime.strptime(r2[1], "%H:%M")
-                        if s2 <= now <= e2:
-                            fallback = alt
-                            break
 
     msgs = [
         {
