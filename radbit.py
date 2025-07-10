@@ -8,7 +8,6 @@ from agents import (
     Runner,
     input_guardrail,
     GuardrailFunctionOutput,
-    RunContextWrapper,
     TResponseInputItem,
 )
 import holidays
@@ -46,11 +45,11 @@ Only allow clear radiology/IT support requests through.
 
 @input_guardrail
 async def radiology_scope_guardrail(
-    ctx: RunContextWrapper[None],
+    ctx: dict,
     agent: Agent,
     input: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
-    out = await Runner.run(guardrail_filter_agent, input, context=ctx.context)
+    out = await Runner.run(guardrail_filter_agent, input, context=ctx)
     return GuardrailFunctionOutput(
         output_info=out.final_output,
         tripwire_triggered=out.final_output.is_off_topic,
