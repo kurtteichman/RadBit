@@ -33,6 +33,11 @@ class OutOfScopeCheck(BaseModel):
     is_off_topic: bool
     explanation: str
 
+class DummyOutOfScopeCheck:
+    def __init__(self, is_off_topic: bool, explanation: str):
+        self.is_off_topic = is_off_topic
+        self.explanation = explanation
+
 guardrail_filter_agent = Agent(
     name="Out-of-Scope Filter",
     instructions="""
@@ -54,11 +59,16 @@ async def radiology_scope_guardrail(
     user_input_str: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
     out = await Runner.run(guardrail_filter_agent, user_input_str, context=ctx.context)
-    if not hasattr(out.final_output, "is_off_topic"):
-        raise AttributeError("Guardrail output is missing 'is_off_topic'. Check if output_type is correct.")
+    output = out.final_output
+    if not hasattr(output, "is_off_topic"):
+        try:
+            parsed = json.loads(user_input_str) if isinstance(user_input_str, str) else {}
+            output = DummyOutOfScopeCheck(**parsed)
+        except Exception:
+            raise AttributeError("Guardrail output is missing 'is_off_topic'. Check if output_type is correct.")
     return GuardrailFunctionOutput(
-        output_info=out.final_output,
-        tripwire_triggered=out.final_output.is_off_topic,
+        output_info=output,
+        tripwire_triggered=output.is_off_topic,
     )
 
 def keyword_based_department_routing(user_input: str) -> str | None:
