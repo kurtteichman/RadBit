@@ -51,9 +51,9 @@ class SimpleRunContext:
 async def radiology_scope_guardrail(
     ctx: SimpleRunContext,
     agent: Agent,
-    input: str | list[TResponseInputItem],
+    user_input_str: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
-    out = await Runner.run(guardrail_filter_agent, input, context=ctx.context)
+    out = await Runner.run(guardrail_filter_agent, user_input_str, context=ctx.context)
     return GuardrailFunctionOutput(
         output_info=out.final_output,
         tripwire_triggered=out.final_output.is_off_topic,
@@ -189,9 +189,9 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     if not dept:
         guardrail_out = run_async_task(radiology_scope_guardrail(
-            ctx=SimpleRunContext(),
-            agent=triage_agent,
-            input=user_input
+            SimpleRunContext(),
+            triage_agent,
+            user_input
         ))
         if guardrail_out.tripwire_triggered:
             raise ValueError("Input was rejected by scope guardrail as off-topic.")
