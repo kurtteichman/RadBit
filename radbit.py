@@ -189,7 +189,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
 
     if not dept:
         guardrail_out = run_async_task(radiology_scope_guardrail(
-            ctx=SimpleRunContext(),,
+            ctx=SimpleRunContext(),
             agent=triage_agent,
             input=user_input
         ))
