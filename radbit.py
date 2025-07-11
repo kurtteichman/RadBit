@@ -44,9 +44,13 @@ Only allow clear radiology/IT support requests through.
     model="gpt-4o",
 )
 
+class SimpleRunContext:
+    def __init__(self):
+        self.context = {}
+
 @input_guardrail
 async def radiology_scope_guardrail(
-    ctx: RunContextWrapper,
+    ctx: SimpleRunContext,
     agent: Agent,
     input: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
