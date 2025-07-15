@@ -13,7 +13,6 @@ from agents import (
 )
 import holidays
 
-_BACKEND_EXAMPLE_INDEX = 0
 _client = OpenAI()
 
 class SupportResponse(BaseModel):
