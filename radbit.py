@@ -8,7 +8,8 @@ from agents import (
     Runner,
     input_guardrail,
     GuardrailFunctionOutput,
-    TResponseInputItem
+    RunContextWrapper,
+    TResponseInputItem,
 )
 import holidays
 
@@ -43,23 +44,16 @@ Only allow clear radiology/IT support requests through.
     model="gpt-4o",
 )
 
-class SimpleRunContext:
-    def __init__(self):
-        self.context = {}
-
 @input_guardrail
 async def radiology_scope_guardrail(
-    ctx: SimpleRunContext,
+    ctx: RunContextWrapper[None],
     agent: Agent,
-    user_input_str: str | list[TResponseInputItem],
+    input: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
-    out = await Runner.run(guardrail_filter_agent, user_input_str, context=ctx.context)
-    output = out.final_output
-    if not hasattr(output, "is_off_topic"):
-        raise AttributeError("Guardrail output is missing 'is_off_topic'. Check if output_type is correct.")
+    out = await Runner.run(guardrail_filter_agent, input, context=ctx.context)
     return GuardrailFunctionOutput(
-        output_info=output,
-        tripwire_triggered=output.is_off_topic,
+        output_info=out.final_output,
+        tripwire_triggered=out.final_output.is_off_topic,
     )
 
 def keyword_based_department_routing(user_input: str) -> str | None:
@@ -155,6 +149,41 @@ SUPPORT_DIRECTORY = {
     },
 }
 
+SUPPORT_DIRECTORY = {
+    "Hospital Reading Rooms": {
+        "phone": "4-HELP (4-4357) or (212) 932-4357",
+        "email": "servicedesk@nyp.org (Subject: RADSUPPORTEASTCRITICAL)",
+        "other": "N/A",
+        "note": "Clinical PACS workstation support",
+        "hours": "24/7",
+    },
+    "Virtual HelpDesk": {
+        "phone": "(212) 746-4878",
+        "email": "N/A",
+        "other": "Zoom: https://nyph.zoom.us/j/9956909465",
+        "note": "Support via Zoom sessions",
+        "hours": "Mon–Fri, 9 AM–5 PM",
+    },
+    "WCINYP IT": {
+        "phone": "Phone Support (24/7): 4-HELP (212-746-4357)",
+        "email": (
+            "• Normal Requests (24/7): nypradtickets@nyp.org"
+            "\n• On-Call (5 PM–8 AM): nypradoncall@nyp.org"
+            " \n(Use for high-priority, patient-care-impacting issues)"
+        ),
+        "other": "Zoom Support (Mon–Fri, 9 AM–5 PM): https://nyph.zoom.us/j/9956909465",
+        "note": "For support with Vue PACS, Medicalis, Fluency, and Diagnostic Workstations.",
+        "hours": "See Above",
+    },
+    "Radiqal": {
+        "phone": "N/A",
+        "email": "N/A - use Radiqal within Medicalis/VuePACS",
+        "other": "Use Radiqal Tip Sheet guidance",
+        "note": "QA system support",
+        "hours": "Platform dependent",
+    },
+}
+
 def run_async_task(task):
     try:
         loop = asyncio.get_event_loop()
@@ -189,19 +218,9 @@ def load_backend_json(path="fake_backend_data.json", index=_BACKEND_EXAMPLE_INDE
 
 def triage_and_get_support_info(user_input: str) -> SupportResponse:
     dept = keyword_based_department_routing(user_input)
-
     if not dept:
-        guardrail_out = run_async_task(radiology_scope_guardrail(
-            SimpleRunContext(),
-            triage_agent,
-            user_input
-        ))
-        if guardrail_out.tripwire_triggered:
-            raise ValueError("Input was rejected by scope guardrail as off-topic.")
-
         tri = run_async_task(Runner.run(triage_agent, user_input))
         dept = tri.final_output.department
-
     if dept not in SUPPORT_DIRECTORY:
         raise ValueError(f"Triage failed, got {dept!r}")
 
