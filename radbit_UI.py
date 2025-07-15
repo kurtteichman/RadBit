@@ -8,7 +8,7 @@ from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
 
-query_params = st.query_params()
+query_params = st.query_params 
 scenario_index = int(query_params.get("scenario", ["0"])[0])
 backend_meta = load_backend_json(index=scenario_index)
 ts = backend_meta["timestamp"]
