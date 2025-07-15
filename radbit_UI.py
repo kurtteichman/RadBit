@@ -1,15 +1,51 @@
+import streamlit as st
 import json
 import os
 from datetime import datetime
-import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
 from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
 
-query_params = st.experimental_get_query_params()
-scenario_index = int(query_params.get("scenario", ["0"])[0])
+scenario_holder = st.empty()
+
+# JS snippet to extract ?scenario= from URL
+st.markdown("""
+<script>
+const params = new URLSearchParams(window.location.search);
+const scenario = params.get("scenario") || "0";
+window.parent.postMessage({scenario}, "*");
+</script>
+""", unsafe_allow_html=True)
+
+scenario = st.text_input("Hidden Scenario Param", value="0", key="scenario_key", label_visibility="collapsed")
+
+# Listen for JS -> Python communication
+if "_scenario_set" not in st.session_state:
+    st.session_state._scenario_set = False
+
+def update_scenario():
+    import streamlit.components.v1 as components
+    components.html("""
+    <script>
+    window.addEventListener("message", (event) => {
+        if (event.data && event.data.scenario !== undefined) {
+            const input = window.parent.document.querySelector("input[data-testid='stTextInput'][id^='scenario_key']");
+            if (input) {
+                input.value = event.data.scenario;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+        }
+    });
+    </script>
+    """, height=0)
+
+if not st.session_state._scenario_set:
+    update_scenario()
+    st.session_state._scenario_set = True
+
+scenario_index = int(st.session_state.get("scenario_key", "0"))
 backend_meta = load_backend_json(index=scenario_index)
 ts = backend_meta["timestamp"]
 
