@@ -212,7 +212,7 @@ def parse_hours_string(hours_string: str):
 
 def get_backend_index(default=0):
     try:
-        return int(st.query_params.get("scenario", [str(default)])[0])
+        return int(st.experimental_get_query_params().get("scenario", [str(default)])[0])
     except:
         return default
 
