@@ -215,7 +215,7 @@ def load_backend_json(path="fake_backend_data.json", index=0):
         arr = json.load(f)
     return arr[index]
 
-def triage_and_get_support_info(user_input: str) -> SupportResponse:
+def triage_and_get_support_info(user_input: str, scenario_index: int = 0) -> SupportResponse:
     dept = keyword_based_department_routing(user_input)
     if not dept:
         tri = run_async_task(Runner.run(triage_agent, user_input))
@@ -223,7 +223,7 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     if dept not in SUPPORT_DIRECTORY:
         raise ValueError(f"Triage failed, got {dept!r}")
 
-    backend = load_backend_json()
+    backend = load_backend_json(index=scenario_index)
     user_meta = backend["user"]
     ts_meta   = backend["timestamp"]
 
