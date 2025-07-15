@@ -13,20 +13,20 @@ st.markdown("""
 window.addEventListener("load", () => {
   const params = new URLSearchParams(window.location.search);
   const scenario = params.get("scenario") || "0";
-  const input = window.parent.document.querySelector("input[id='scenario_input']");
-  if (input) {
-    input.value = scenario;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+  const streamlitInput = window.parent.document.querySelector("input[data-testid='stTextInput']");
+  if (streamlitInput) {
+    streamlitInput.value = scenario;
+    streamlitInput.dispatchEvent(new Event("input", { bubbles: true }));
   }
 });
 </script>
 """, unsafe_allow_html=True)
 
-scenario_index_str = st.text_input("Scenario", value="0", key="scenario_key", label_visibility="collapsed", id="scenario_input")
+scenario_index_str = st.text_input("Scenario Param", value="0", label_visibility="collapsed")
 
 st.markdown("""
 <style>
-input[id="scenario_input"] {
+div[data-testid="stTextInput"] {
     display: none;
 }
 </style>
