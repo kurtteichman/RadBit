@@ -53,7 +53,7 @@ async def radiology_scope_guardrail(
     agent: Agent,
     user_input_str: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
-    out = await Runner.run(agent, user_input_str, context=ctx.context)
+    out = await Runner.run(guardrail_filter_agent, user_input_str, context=ctx.context)
     output = out.final_output
     if not hasattr(output, "is_off_topic"):
         raise AttributeError("Guardrail output is missing 'is_off_topic'. Check if output_type is correct.")
