@@ -3,13 +3,12 @@ import os
 from datetime import datetime
 import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
-from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
+from radbit import triage_and_get_support_info, generate_faqs, load_backend_json, get_backend_index
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
 
-query_params = st.query_params 
-scenario_index = int(query_params.get("scenario", ["0"])[0])
+scenario_index = get_backend_index()
 backend_meta = load_backend_json(index=scenario_index)
 ts = backend_meta["timestamp"]
 
@@ -158,5 +157,5 @@ with st.expander("24-Hour Digest & FAQs", expanded=False):
     else:
         for faq in faqs:
             st.markdown(f"**Q: {faq['question']}**")
-            st.markdown(f"A: {faq['answer']}")
+            st.markdown(f"A: {faq['answer']}") 
             st.markdown("---")
