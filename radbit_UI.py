@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
-from radbit import triage_and_get_support_info, generate_faqs, load_backend_json, get_backend_index
+from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
 
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
