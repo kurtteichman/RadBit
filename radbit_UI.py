@@ -8,44 +8,43 @@ from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
 
-scenario_holder = st.empty()
-
-# JS snippet to extract ?scenario= from URL
 st.markdown("""
 <script>
-const params = new URLSearchParams(window.location.search);
-const scenario = params.get("scenario") || "0";
-window.parent.postMessage({scenario}, "*");
+window.addEventListener("load", () => {
+  const params = new URLSearchParams(window.location.search);
+  const scenario = params.get("scenario") || "0";
+  const input = window.parent.document.querySelector("input[id='scenario_input']");
+  if (input) {
+    input.value = scenario;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+});
 </script>
 """, unsafe_allow_html=True)
 
-scenario = st.text_input("Hidden Scenario Param", value="0", key="scenario_key", label_visibility="collapsed")
+scenario_index_str = st.text_input("Scenario", value="0", key="scenario_key", label_visibility="collapsed", id="scenario_input")
 
-# Listen for JS -> Python communication
-if "_scenario_set" not in st.session_state:
-    st.session_state._scenario_set = False
+st.markdown("""
+<style>
+input[id="scenario_input"] {
+    display: none;
+}
+</style>
+""", unsafe_allow_html=True)
 
-def update_scenario():
-    import streamlit.components.v1 as components
-    components.html("""
-    <script>
-    window.addEventListener("message", (event) => {
-        if (event.data && event.data.scenario !== undefined) {
-            const input = window.parent.document.querySelector("input[data-testid='stTextInput'][id^='scenario_key']");
-            if (input) {
-                input.value = event.data.scenario;
-                input.dispatchEvent(new Event("input", { bubbles: true }));
-            }
-        }
-    });
-    </script>
-    """, height=0)
+try:
+    scenario_index = int(scenario_index_str)
+except ValueError:
+    scenario_index = 0
 
-if not st.session_state._scenario_set:
-    update_scenario()
-    st.session_state._scenario_set = True
+if "scenario_loaded" not in st.session_state:
+    st.session_state["scenario_loaded"] = False
 
-scenario_index = int(st.session_state.get("scenario_key", "0"))
+if not st.session_state["scenario_loaded"] and scenario_index_str == "0":
+    st.stop()
+
+st.session_state["scenario_loaded"] = True
+
 backend_meta = load_backend_json(index=scenario_index)
 ts = backend_meta["timestamp"]
 
