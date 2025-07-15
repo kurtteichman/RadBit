@@ -61,7 +61,7 @@ with left:
     if submit and current_input.strip():
         try:
             with st.spinner("Identifying your request..."):
-                result = triage_and_get_support_info(current_input.strip())
+                result = triage_and_get_support_info(current_input.strip(), scenario_index=scenario_index)
                 st.session_state.triage_result = result
                 st.session_state.show_email_draft = True
                 st.session_state.last_submitted_input = current_input.strip()
