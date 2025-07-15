@@ -8,11 +8,46 @@ from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
 set_default_openai_key(st.secrets["OPENAI_API_KEY"])
 st.set_page_config(page_title="Radiology Support", layout="wide")
 
-params = st.query_params
-scenario_index = int(params.get("scenario", "0"))
+if "scenario_index" not in st.session_state:
+    st.session_state["scenario_index"] = 0
+
+st.markdown("""
+<script>
+window.addEventListener("DOMContentLoaded", function() {
+    const params = new URLSearchParams(window.location.search);
+    const scenario = params.get("scenario") || "0";
+    const streamlitInput = window.parent.document.querySelector('input[type="text"][data-testid="stTextInput"]');
+    if (streamlitInput) {
+        streamlitInput.value = scenario;
+        streamlitInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+});
+</script>
+""", unsafe_allow_html=True)
+
+scenario_str = st.text_input("Hidden Scenario Input", value="0", label_visibility="collapsed")
+
+st.markdown("""
+<style>
+div[data-testid="stTextInput"] {
+    display: none;
+}
+</style>
+""", unsafe_allow_html=True)
+
+try:
+    scenario_index = int(scenario_str)
+except:
+    scenario_index = 0
+
+if not st.session_state.get("scenario_initialized") and scenario_index == 0:
+    st.stop()
+
+st.session_state["scenario_index"] = scenario_index
+st.session_state["scenario_initialized"] = True
+
 backend_meta = load_backend_json(index=scenario_index)
 ts = backend_meta["timestamp"]
-
 
 with st.sidebar:
     st.markdown("### Timestamp")
