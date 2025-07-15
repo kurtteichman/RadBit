@@ -210,15 +210,7 @@ def parse_hours_string(hours_string: str):
             return None
     return None
 
-def get_backend_index(default=0):
-    try:
-        return int(st.experimental_get_query_params().get("scenario", [str(default)])[0])
-    except:
-        return default
-
-def load_backend_json(path="fake_backend_data.json", index=None):
-    if index is None:
-        index = get_backend_index()
+def load_backend_json(path="fake_backend_data.json", index=0):
     with open(path, "r") as f:
         arr = json.load(f)
     return arr[index]
