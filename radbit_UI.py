@@ -1,7 +1,7 @@
+import streamlit as st
 import json
 import os
 from datetime import datetime
-import streamlit as st
 from agents import set_default_openai_key, InputGuardrailTripwireTriggered
 from radbit import triage_and_get_support_info, generate_faqs, load_backend_json
 
@@ -13,7 +13,14 @@ else:
 
 st.set_page_config(page_title="Radiology Support", layout="wide")
 
-backend_meta = load_backend_json()
+params = st.query_params
+raw = params.get("scenario", "0")
+try:
+    scenario_index = int(raw)
+except:
+    scenario_index = 0
+
+backend_meta = load_backend_json(index=scenario_index)
 ts = backend_meta["timestamp"]
 
 with st.sidebar:
@@ -59,7 +66,7 @@ with left:
     if submit and current_input.strip():
         try:
             with st.spinner("Identifying your request..."):
-                result = triage_and_get_support_info(current_input.strip())
+                result = triage_and_get_support_info(current_input.strip(), scenario_index=scenario_index)
                 st.session_state.triage_result = result
                 st.session_state.show_email_draft = True
                 st.session_state.last_submitted_input = current_input.strip()
@@ -161,5 +168,5 @@ with st.expander("24-Hour Digest & FAQs", expanded=False):
     else:
         for faq in faqs:
             st.markdown(f"**Q: {faq['question']}**")
-            st.markdown(f"A: {faq['answer']}")
+            st.markdown(f"A: {faq['answer']}") 
             st.markdown("---")

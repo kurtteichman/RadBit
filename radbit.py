@@ -13,7 +13,6 @@ from agents import (
 )
 import holidays
 
-_BACKEND_EXAMPLE_INDEX = 2
 _client = OpenAI()
 
 class SupportResponse(BaseModel):
@@ -56,24 +55,34 @@ async def radiology_scope_guardrail(
         tripwire_triggered=out.final_output.is_off_topic,
     )
 
+def keyword_based_department_routing(user_input: str) -> str | None:
+    text = user_input.lower()
+    if any(kw in text for kw in ["mouse speed", "gaming mouse", "change mouse sensitivity"]):
+        return "WCINYP IT"
+    if any(kw in text for kw in ["g hub", "mouse macro", "macros on my mouse"]):
+        return "Radiqal"
+    if any(kw in text for kw in ["screen scaling", "display scaling", "adjust display settings", "first time logging in"]):
+        return "WCINYP IT"
+    return None
+
 hospital_rr_agent = Agent(
     name="Hospital Reading Rooms Agent",
-    instructions="Handle clinical PACS/viewer crashes or freezes during CT/MRI interpretation.",
+    instructions="Support for issues during image interpretation in PACS systems like viewer freezes, CT/MRI image crashes, or diagnostic disruptions.",
     model="gpt-4o",
 )
 virtual_helpdesk_agent = Agent(
     name="Virtual HelpDesk Agent",
-    instructions="Handle in-hospital desktop/login or certificate issues; Zoom support available.",
+    instructions="Only handle in-hospital workstation access problems (e.g., badge logins, password resets, SSO/certificates). Do NOT handle workstation software, macros, display settings, PACS viewers, or hardware config.",
     model="gpt-4o",
 )
 wcinyp_agent = Agent(
     name="WCINYP IT Agent",
-    instructions="Handle remote/home issues: VPN, Outlook, EPIC, email sync.",
+    instructions="Handle home/remote setup issues (e.g., VPN, EPIC, Outlook, keyboard/mouse setup, display scaling, VuePACS config, hardware problems, software installs, peripheral calibration). Also covers first-time login setup.",
     model="gpt-4o",
 )
 radiqal_agent = Agent(
     name="Radiqal Agent",
-    instructions="Handle QA/discrepancy tickets via Radiqal within PACS.",
+    instructions="Handle QA workflow breakdowns, missing templates, and system-specific issues in Radiqal, Fluency, or PACS integrations involving macros or viewer behaviors.",
     model="gpt-4o",
 )
 
@@ -86,12 +95,17 @@ Given a user support issue, choose exactly one of the following departments and 
 {"department": "WCINYP IT"}, 
 {"department": "Radiqal"}
 
-Use the following examples as guidance:
+Use this rule set:
 
-- WCINYP IT: Issues with display scaling, gaming mouse speed, duplicate dictation, VuePACS lossy images, Stat DX not launching, hardware problems, server address corrections (Olea/TeraRecon/Dynacad), or general workstation/network setup.
-- Radiqal: Mouse macros not working in G HUB, unable to access Fluency templates, or unable to view outside studies in VuePACS — particularly when related to Radiqal or QA systems.
+- WCINYP IT: Issues with display scaling, gaming mouse speed, duplicate dictation, VuePACS lossy images, Stat DX not launching, hardware setup, server address corrections (Olea/TeraRecon/Dynacad), monitor config, workstation behavior, or onboarding/first-login screen layout problems.
 
-Decide only based on the issue type and nature — not personal preference or tone. Do not return multiple departments.
+- Radiqal: Issues involving macros in G HUB, missing or broken Fluency templates, inability to view outside studies in VuePACS, and all QA workflow/platform discrepancies or tip sheet-based platforms.
+
+- Hospital Reading Rooms: Crashes/freezes of the PACS viewer during interpretation, sudden PACS lockups, or reading disruptions that affect diagnostic throughput.
+
+- Virtual HelpDesk: In-hospital desktop login/certificate/access problems (badge, Duo, SSO), ONLY if no mention of hardware config or software calibration.
+
+Return JSON exactly like {"department": "Radiqal"}.
 """,
     output_type=DepartmentLabel,
     handoffs=[hospital_rr_agent, virtual_helpdesk_agent, wcinyp_agent, radiqal_agent],
@@ -161,13 +175,20 @@ def parse_hours_string(hours_string: str):
             return None
     return None
 
-def load_backend_json(path="fake_backend_data.json", index=_BACKEND_EXAMPLE_INDEX):
+def load_backend_json(path="fake_backend_data.json", index=0):
     with open(path, "r") as f:
         arr = json.load(f)
     return arr[index]
 
-def triage_and_get_support_info(user_input: str) -> SupportResponse:
-    backend = load_backend_json()
+def triage_and_get_support_info(user_input: str, scenario_index: int = 0) -> SupportResponse:
+    dept = keyword_based_department_routing(user_input)
+    if not dept:
+        tri = run_async_task(Runner.run(triage_agent, user_input))
+        dept = tri.final_output.department
+    if dept not in SUPPORT_DIRECTORY:
+        raise ValueError(f"Triage failed, got {dept!r}")
+
+    backend = load_backend_json(index=scenario_index)
     user_meta = backend["user"]
     ts_meta   = backend["timestamp"]
 
@@ -177,10 +198,6 @@ def triage_and_get_support_info(user_input: str) -> SupportResponse:
     dow      = ts_meta["day_of_week"]
     weekend  = ts_meta["is_weekend_or_holiday"].lower() == "yes"
 
-    tri = run_async_task(Runner.run(triage_agent, user_input))
-    dept = tri.final_output.department
-    if dept not in SUPPORT_DIRECTORY:
-        raise ValueError(f"Triage failed, got {dept!r}")
     info = SUPPORT_DIRECTORY[dept]
 
     now = datetime.strptime(t_str, "%H:%M:%S")
@@ -266,8 +283,10 @@ def generate_faqs(history: list[dict]) -> list[dict]:
         results = []
         for faq in parsed:
             input_example = faq.get("input_example", "")
-            triage = run_async_task(Runner.run(triage_agent, input_example))
-            dept = triage.final_output.department
+            dept = keyword_based_department_routing(input_example)
+            if not dept:
+                triage = run_async_task(Runner.run(triage_agent, input_example))
+                dept = triage.final_output.department
             contact = SUPPORT_DIRECTORY.get(dept, {})
             steps = faq.get("steps", [])
             answer = "\n### Self-Help Steps\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(steps))
@@ -283,5 +302,3 @@ def generate_faqs(history: list[dict]) -> list[dict]:
 
     except Exception as e:
         return [{"question": "OpenAI API call failed", "answer": str(e)}]
-
-    return []
